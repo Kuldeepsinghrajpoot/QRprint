@@ -83,7 +83,7 @@ function LoginForm() {
         </div>
 
         <div className="relative text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
-          © QRtoPrint · Shop Dashboard
+          © QRtoPrint · Shop Dashboard powered by  Lexical Software
         </div>
       </div>
 
