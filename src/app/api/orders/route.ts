@@ -1,4 +1,6 @@
-import { sweepStaleFiles } from "@/lib/fileCleanup";
+import { shopOpenStatus } from "@/lib/shopHours";
+import { serverError } from "@/lib/apiError";
+import { maybeRunCleanup } from "@/lib/fileCleanup";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
@@ -11,6 +13,8 @@ import { isRazorpayConfigured, verifyRazorpaySignature, fetchRazorpayOrder } fro
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { getSession } from "@/lib/session";
 import { publicUrlForKey } from "@/lib/storage";
+import { resolveShopId } from "@/lib/shop";
+import { newCancelKey, hashCancelKey } from "@/lib/cancelKey";
 
 export const runtime = "nodejs";
 
@@ -30,11 +34,13 @@ const createOrderSchema = z.object({
   pageCountEstimated: z.boolean().default(false),
   copies: z.number().int().min(1).max(50),
   priority: z.boolean().default(false),
-  paymentMethod: z.enum(["cash", "online"]),
+  paymentMethod: z.enum(["cash", "online", "free"]),
   // Present only for real Razorpay payments (omitted in simulated/test-mode flow)
   razorpayOrderId: z.string().optional(),
   razorpayPaymentId: z.string().optional(),
   razorpaySignature: z.string().optional(),
+  // Which shop the customer scanned (from the QR link ?shop=...). Missing = the original single shop.
+  shop: z.string().trim().max(40).optional(),
 });
 
 /** GET /api/orders — shop dashboard live queue (staff/owner login required) */
@@ -48,11 +54,12 @@ export async function GET(req: NextRequest) {
 
   // Auto-cancel cash orders that have sat unpaid for too long (default 20 min),
   // so the queue doesn't get clogged by no-shows / abandoned orders.
-  const timeoutMinutes = Number(process.env.CASH_AUTO_CANCEL_MINUTES || 20);
+  const shopCfg = await PricingConfig.findOne({ shopId: session.shopId }).select("cashAutoCancelMinutes").lean();
+  const timeoutMinutes = Number(shopCfg?.cashAutoCancelMinutes || process.env.CASH_AUTO_CANCEL_MINUTES || 20);
   const cutoff = new Date(Date.now() - timeoutMinutes * 60 * 1000);
   await Order.updateMany(
     {
-      shopId: "main",
+      shopId: session.shopId,
       paymentMethod: "cash",
       paymentStatus: "pending",
       printStatus: "queued",
@@ -61,14 +68,27 @@ export async function GET(req: NextRequest) {
     { $set: { printStatus: "failed", printerError: "Auto-cancelled: cash payment not confirmed in time" } }
   );
 
-  // Safety net for the "delete the file once collected/cancelled" privacy feature (retries failed deletes).
-  await sweepStaleFiles().catch(() => {});
+  // Safety net for the privacy feature: retries failed deletes and removes files that are no longer needed (at most every 10 min).
+  await maybeRunCleanup();
 
   const status = req.nextUrl.searchParams.get("printStatus");
-  const filter: Record<string, unknown> = { shopId: "main" };
+  const filter: Record<string, unknown> = { shopId: session.shopId };
   if (status) filter.printStatus = status;
 
-  const orders = await Order.find(filter).sort({ createdAt: -1 }).limit(200).lean();
+  // The Live Queue asks for one calendar day (?date=YYYY-MM-DD&tz=<Date#getTimezoneOffset>) so it starts fresh every day;
+  // older orders live in Order History. Without ?date it returns the latest orders as before.
+  const date = req.nextUrl.searchParams.get("date");
+  if (date) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+    const tz = Number(req.nextUrl.searchParams.get("tz") ?? 0);
+    if (!m || !Number.isFinite(tz) || Math.abs(tz) > 14 * 60) {
+      return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+    }
+    const start = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) + tz * 60 * 1000);
+    filter.createdAt = { $gte: start, $lt: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
+  }
+
+  const orders = await Order.find(filter).sort({ createdAt: -1 }).limit(date ? 1000 : 200).lean();
   return NextResponse.json(orders);
 }
 
@@ -91,9 +111,14 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
 
-    let config = await PricingConfig.findOne({ shopId: "main" });
+    const shopId = await resolveShopId(data.shop);
+    if (!shopId) {
+      return NextResponse.json({ error: "Shop not found — please scan the shop QR code again" }, { status: 404 });
+    }
+
+    let config = await PricingConfig.findOne({ shopId });
     if (!config) {
-      config = await PricingConfig.create({ shopId: "main", shopName: "My Print Shop", rates: DEFAULT_RATES });
+      config = await PricingConfig.create({ shopId, shopName: "My Print Shop", rates: DEFAULT_RATES });
     }
 
     // The pause switch is documented as blocking new orders; enforce it here
@@ -102,10 +127,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "The shop is not accepting orders right now" }, { status: 503 });
     }
 
-    if (data.paymentMethod === "cash" && !config.cashPaymentEnabled) {
+    // Shop Controls: opening hours, order limits, phone requirement, waiting-order cap
+    const hours = shopOpenStatus(config);
+    if (!hours.open) {
+      return NextResponse.json({ error: hours.message }, { status: 503 });
+    }
+    if (config.requirePhone && !/^\+?[0-9][0-9 -]{6,18}$/.test(data.customerPhone || "")) {
+      return NextResponse.json({ error: "Please enter a valid mobile number" }, { status: 400 });
+    }
+    if (config.maxPagesPerOrder > 0 && data.pages > config.maxPagesPerOrder) {
+      return NextResponse.json({ error: `This shop accepts up to ${config.maxPagesPerOrder} pages per order. Please split your file.` }, { status: 400 });
+    }
+    if (config.maxActiveOrders > 0) {
+      const waiting = await Order.countDocuments({ shopId, printStatus: { $in: ["queued", "printing"] } });
+      if (waiting >= config.maxActiveOrders) {
+        return NextResponse.json({ error: "The shop is very busy right now. Please try again in a few minutes." }, { status: 503 });
+      }
+    }
+
+    // Free printing (college / office): no payment at all. The order is marked paid with a total of 0 so it goes
+    // straight to the queue and never counts as revenue or cash to collect.
+    const free = config.freePrinting === true;
+    if (data.paymentMethod === "free" && !free) {
+      return NextResponse.json({ error: "This shop is not offering free printing" }, { status: 400 });
+    }
+    const paymentMethod = free ? "free" : data.paymentMethod;
+    if (!free && !config.cashPaymentEnabled && !config.onlinePaymentEnabled) {
+      return NextResponse.json({ error: "This shop isn't taking orders right now. Please check back later." }, { status: 503 });
+    }
+    if (paymentMethod === "cash" && !config.cashPaymentEnabled) {
       return NextResponse.json({ error: "Cash payment is currently disabled by the shop" }, { status: 400 });
     }
-    if (data.paymentMethod === "online" && !config.onlinePaymentEnabled) {
+    if (paymentMethod === "online" && !config.onlinePaymentEnabled) {
       return NextResponse.json({ error: "Online payment is currently disabled by the shop" }, { status: 400 });
     }
 
@@ -126,12 +179,16 @@ export async function POST(req: NextRequest) {
       gstPercent: config.gstPercent,
     });
 
+    if (!free && config.minOrderAmount > 0 && price.total < config.minOrderAmount) {
+      return NextResponse.json({ error: `The minimum order is ₹${config.minOrderAmount}` }, { status: 400 });
+    }
+
     // Determine payment status:
     // - Cash: always starts "pending" (confirmed later at the counter)
     // - Online + Razorpay configured: MUST include a valid signature to be marked "paid"
     // - Online + Razorpay NOT configured: simulated test-mode flow, marked "paid" immediately
-    let paymentStatus: "pending" | "paid" = "pending";
-    if (data.paymentMethod === "online") {
+    let paymentStatus: "pending" | "paid" = free ? "paid" : "pending";
+    if (paymentMethod === "online") {
       if (isRazorpayConfigured()) {
         const hasSignature = data.razorpayOrderId && data.razorpayPaymentId && data.razorpaySignature;
         if (!hasSignature) {
@@ -180,13 +237,15 @@ export async function POST(req: NextRequest) {
     // rather than trusting a client-sent flag.
     const requiresManualPrint = /\.(docx?|zip)$/i.test(data.fileName || "");
 
-    let order;
+    const cancelKey = newCancelKey();
+    type CreatedOrder = Awaited<ReturnType<typeof Order.create>> extends (infer T)[] ? T : Awaited<ReturnType<typeof Order.create>>;
+    let order!: CreatedOrder;
     let token = generateToken();
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         order = await Order.create({
           token,
-          shopId: "main",
+          shopId,
           customerName: data.customerName,
           customerPhone: data.customerPhone,
           fileUrl: data.fileKey ? publicUrlForKey(data.fileKey) : undefined,
@@ -205,11 +264,12 @@ export async function POST(req: NextRequest) {
           priorityFee: price.priorityFee,
           gstRate: config.gstEnabled ? config.gstPercent : 0,
           gstAmount: price.gstAmount,
-          totalPrice: price.total,
-          paymentMethod: data.paymentMethod,
+          totalPrice: free ? 0 : price.total,
+          paymentMethod,
           paymentStatus,
           printStatus: "queued",
           razorpayPaymentId: data.razorpayPaymentId,
+          cancelKeyHash: hashCancelKey(cancelKey),
         });
         break;
       } catch (err: unknown) {
@@ -223,13 +283,13 @@ export async function POST(req: NextRequest) {
     // Loyalty tracking (only if phone provided)
     if (data.customerPhone) {
       await Customer.findOneAndUpdate(
-        { shopId: "main", phone: data.customerPhone },
+        { shopId, phone: data.customerPhone },
         {
           $set: { name: data.customerName },
           $inc: {
             totalOrders: 1,
-            totalSpent: price.total,
-            loyaltyPoints: pointsForAmount(price.total),
+            totalSpent: free ? 0 : price.total,
+            loyaltyPoints: free ? 0 : pointsForAmount(price.total),
           },
         },
         { upsert: true }
@@ -242,9 +302,11 @@ export async function POST(req: NextRequest) {
       }).catch(() => {});
     }
 
-    return NextResponse.json(order, { status: 201 });
+    // The cancel secret is shown to the customer once (never stored in plain text).
+    const { cancelKeyHash: _hash, ...publicOrder } = order.toObject();
+    void _hash;
+    return NextResponse.json({ ...publicOrder, cancelKey }, { status: 201 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to create order";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, "Failed to create order");
   }
 }

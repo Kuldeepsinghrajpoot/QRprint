@@ -5,14 +5,18 @@ import { useEffect, useState, use } from "react";
 interface TrackedOrder {
   token: string;
   customerName: string;
-  printStatus: "queued" | "printing" | "ready" | "collected" | "failed";
+  printStatus: "queued" | "printing" | "ready" | "collected" | "failed" | "cancelled";
+  cancelledBy?: "customer" | "shop";
+  cancelReason?: string;
   paymentStatus: "pending" | "paid" | "refunded";
-  paymentMethod: "cash" | "online";
+  paymentMethod: "cash" | "online" | "free";
   totalPrice: number;
   pages: number;
   copies: number;
   printType: "bw" | "color";
   createdAt: string;
+  ahead?: number;
+  waitMinutes?: number;
 }
 
 const STEPS: { key: TrackedOrder["printStatus"]; label: string }[] = [
@@ -69,7 +73,23 @@ export default function TrackOrderPage({ params }: { params: Promise<{ token: st
             <>
               <p className="text-center font-semibold mb-6">Hi {order.customerName} 👋</p>
 
-              <div className="space-y-0">
+              {order.printStatus === "cancelled" && (
+                <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 mb-4">
+                  <b>This order was cancelled{order.cancelledBy === "shop" ? " by the shop" : ""}.</b>
+                  {order.cancelReason ? ` Reason: ${order.cancelReason}.` : ""}
+                  {order.paymentStatus === "refunded" ? " Your payment is being refunded." : ""}
+                </div>
+              )}
+
+              {order.ahead !== undefined && (
+                <div className="mb-5 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-center text-sm text-blue-800">
+                  {order.ahead === 0
+                    ? "⏱️ You're next. Your print is about to start."
+                    : `⏱️ ${order.ahead} ${order.ahead === 1 ? "order" : "orders"} ahead of you · about ${order.waitMinutes} min`}
+                </div>
+              )}
+
+              <div className={order.printStatus === "cancelled" ? "hidden" : "space-y-0"}>
                 {STEPS.map((step, i) => {
                   const done = i <= currentIndex;
                   const isFailed = order.printStatus === "failed" && i === 1;
@@ -110,10 +130,10 @@ export default function TrackOrderPage({ params }: { params: Promise<{ token: st
               <div className="bg-indigo-50/60 rounded-xl px-4 py-3 text-[13.5px] space-y-1.5 mt-2">
                 <Row label="Print Type" value={order.printType === "bw" ? "Black & White" : "Color"} />
                 <Row label="Pages × Copies" value={`${order.pages} × ${order.copies}`} />
-                <Row label="Payment" value={order.paymentStatus === "paid" ? "Paid ✅" : "Pending at counter"} />
+                <Row label="Payment" value={order.paymentMethod === "free" ? "Free printing" : order.paymentStatus === "paid" ? "Paid ✅" : order.paymentStatus === "refunded" ? "Refunded" : "Pending at counter"} />
                 <div className="flex justify-between pt-2 mt-1 border-t border-dashed border-slate-300 font-bold text-slate-800">
                   <span>Total</span>
-                  <span>₹{order.totalPrice}</span>
+                  <span>{order.paymentMethod === "free" ? "Free" : `₹${order.totalPrice}`}</span>
                 </div>
               </div>
             </>

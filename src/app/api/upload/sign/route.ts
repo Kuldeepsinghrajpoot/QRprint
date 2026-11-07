@@ -1,3 +1,4 @@
+import { serverError } from "@/lib/apiError";
 import { NextRequest, NextResponse } from "next/server";
 import { createSignedUpload, isDirectUploadEnabled } from "@/lib/storage";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
@@ -44,7 +45,6 @@ export async function POST(req: NextRequest) {
     const { key, signedUrl, url } = await createSignedUpload(fileName);
     return NextResponse.json({ direct: true, key, signedUrl, fileUrl: url, fileName });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Could not start the upload";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, "Could not start the upload");
   }
 }

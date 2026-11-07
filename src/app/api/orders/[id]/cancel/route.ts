@@ -6,6 +6,8 @@ import { purgeOrderFile } from "@/lib/fileCleanup";
 import { isRazorpayConfigured, refundRazorpayPayment } from "@/lib/razorpay";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { CANCEL_WINDOW_MS } from "@/lib/orderTiming";
+import { cancelKeyMatches } from "@/lib/cancelKey";
+import { serverError } from "@/lib/apiError";
 
 export const runtime = "nodejs";
 
@@ -29,10 +31,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!mongoose.isValidObjectId(id)) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
-    await connectDB();
-    const order = await Order.findById(id);
+    const body = await req.json().catch(() => null);
+    const key = typeof body?.key === "string" ? body.key : undefined;
 
-    if (!order) {
+    await connectDB();
+    const order = await Order.findById(id).select("+cancelKeyHash");
+
+    // Same answer for "no such order" and "wrong key", so order ids can't be probed.
+    if (!order || !cancelKeyMatches(key, order.cancelKeyHash)) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
@@ -53,7 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // so we never refund money for an order that is already printing.
     const cancelled = await Order.findOneAndUpdate(
       { _id: id, printStatus: "queued" },
-      { $set: { printStatus: "cancelled", cancelledAt: new Date() } },
+      { $set: { printStatus: "cancelled", cancelledAt: new Date(), cancelledBy: "customer" } },
       { new: true }
     );
     if (!cancelled) {
@@ -83,7 +89,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ order: cancelled, refundIssued });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to cancel order";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, "Failed to cancel order");
   }
 }

@@ -2,8 +2,9 @@
 
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import FluentIcon from "@/components/lexical/FluentIcon";
-import { Alert, LEX_FONT, TextField } from "@/components/lexical/ui";
+import { Alert, LEX_FONT, TextField, PAGE_BG } from "@/components/lexical/ui";
 
 function LoginForm() {
   const router = useRouter();
@@ -37,7 +38,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen flex-1 bg-white" style={{ fontFamily: LEX_FONT }}>
+    <div className="flex min-h-screen flex-1" style={{ fontFamily: LEX_FONT, background: PAGE_BG }}>
       <link
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap"
@@ -47,7 +48,7 @@ function LoginForm() {
       {/* Brand panel */}
       <div
         className="relative hidden flex-1 flex-col justify-between overflow-hidden p-12 text-white lg:flex"
-        style={{ background: "linear-gradient(135deg, #312E81 0%, #4F46E5 55%, #6366F1 100%)" }}
+        style={{ background: "linear-gradient(135deg, var(--accent-dark) 0%, var(--accent) 55%, var(--accent-light) 100%)" }}
       >
         <div className="absolute -right-24 -top-24 h-80 w-80 rounded-full bg-white/10" />
         <div className="absolute -bottom-32 -left-20 h-96 w-96 rounded-full bg-white/[0.07]" />
@@ -87,12 +88,12 @@ function LoginForm() {
       </div>
 
       {/* Form panel */}
-      <div className="flex w-full items-center justify-center bg-[#F4F6FB] px-5 py-10 lg:w-[480px] lg:shrink-0 lg:bg-white">
+      <div className="flex w-full items-center justify-center px-5 py-10 lg:w-[480px] lg:shrink-0 lg:bg-white">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
             <span
               className="flex h-10 w-10 items-center justify-center rounded-[10px]"
-              style={{ background: "linear-gradient(135deg, #312E81 0%, #4F46E5 60%, #6366F1 100%)" }}
+              style={{ background: "linear-gradient(135deg, var(--accent-dark) 0%, var(--accent) 60%, var(--accent-light) 100%)" }}
             >
               <FluentIcon name="printer" size={26} />
             </span>
@@ -113,12 +114,15 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-[#4F46E5] py-2.5 text-[0.9375rem] font-medium text-white shadow-[0_2px_6px_rgba(79,70,229,0.48)] transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+              className="w-full rounded-lg bg-[color:var(--accent)] py-2.5 text-[0.9375rem] font-medium text-white transition active:bg-[color:var(--accent-dark)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
             >
               {loading ? "Signing in…" : "Sign in"}
             </button>
-            <p className="text-center text-xs text-slate-900/50">
-              First time? Run <code className="rounded bg-slate-900/[0.06] px-1.5 py-0.5">npm run seed</code> to create an owner account.
+            <p className="text-center text-sm text-slate-900/60">
+              New shop?{" "}
+              <Link href="/signup" className="font-medium text-[color:var(--accent)] active:underline">
+                Create an account
+              </Link>
             </p>
           </form>
         </div>

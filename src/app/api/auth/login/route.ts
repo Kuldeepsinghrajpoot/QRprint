@@ -1,3 +1,4 @@
+import { serverError } from "@/lib/apiError";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
@@ -55,7 +56,6 @@ export async function POST(req: NextRequest) {
     });
     return res;
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Login failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, "Login failed");
   }
 }

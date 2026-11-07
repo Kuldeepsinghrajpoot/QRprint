@@ -1,8 +1,9 @@
+import { serverError } from "@/lib/apiError";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
 import { Printer } from "@/models/Printer";
-import { verifyAgentKey } from "@/lib/agentAuth";
+import { getAgentShopId } from "@/lib/agentAuth";
 import { aggregateStatus } from "@/lib/printerHosts";
 
 export const runtime = "nodejs";
@@ -19,7 +20,8 @@ const schema = z.object({
  * shop dashboard shows real-time printer health (online/offline/jam/etc.).
  */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!verifyAgentKey(req)) {
+  const shopId = await getAgentShopId(req);
+  if (!shopId) {
     return NextResponse.json({ error: "Invalid or missing agent key" }, { status: 401 });
   }
 
@@ -36,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { status, agentId } = parsed.data;
     const now = new Date();
 
-    const printer = await Printer.findById(id);
+    const printer = await Printer.findOne({ _id: id, shopId });
     if (!printer) return NextResponse.json({ error: "Printer not found" }, { status: 404 });
 
     const host = agentId ? printer.hosts.find((h) => h.agentId === agentId) : undefined;
@@ -55,7 +57,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return NextResponse.json(printer);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to update printer status";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, "Failed to update printer status");
   }
 }

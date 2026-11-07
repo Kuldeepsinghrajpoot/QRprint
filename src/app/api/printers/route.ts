@@ -1,3 +1,4 @@
+import { serverError } from "@/lib/apiError";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
@@ -19,8 +20,9 @@ export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const shopId = session.shopId;
   await connectDB();
-  const printers = await Printer.find({ shopId: "main" }).sort({ createdAt: 1 });
+  const printers = await Printer.find({ shopId }).sort({ createdAt: 1 });
 
   // "Printed today" is computed from real orders (it was a stored counter
   // that nothing ever updated). "Today" = since midnight in the shop's timezone.
@@ -38,7 +40,7 @@ export async function GET() {
   const stats = await Order.aggregate([
     {
       $match: {
-        shopId: "main",
+        shopId,
         printerId: { $in: printers.map((x) => x._id) },
         printStatus: { $in: ["ready", "collected"] },
         updatedAt: { $gte: startOfToday },
@@ -83,10 +85,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
     await connectDB();
-    const printer = await Printer.create({ shopId: "main", ...parsed.data, status: "offline" });
+    const printer = await Printer.create({ shopId: session.shopId, ...parsed.data, status: "offline" });
     return NextResponse.json(printer, { status: 201 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to add printer";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, "Failed to add printer");
   }
 }

@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!mongoose.isValidObjectId(id)) return NextResponse.json({ error: "Order not found" }, { status: 404 });
   await connectDB();
 
-  const order = await Order.findById(id).lean();
+  const order = await Order.findOne({ _id: id, shopId: session.shopId }).lean();
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
   const config = await PricingConfig.findOne({ shopId: order.shopId }).lean();
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (order.priorityFee > 0) draw(`Priority/Rush Fee: Rs. ${order.priorityFee}`);
   if (order.gstAmount > 0) draw(`GST (${order.gstRate}%): Rs. ${order.gstAmount}`);
   draw(`Total Paid: Rs. ${order.totalPrice}`, { f: bold, size: 13, color: [0.09, 0.64, 0.29] });
-  draw(`Payment Method: ${order.paymentMethod === "cash" ? "Cash" : "UPI / Online"}`);
+  draw(`Payment Method: ${order.paymentMethod === "cash" ? "Cash" : order.paymentMethod === "free" ? "Free (no charge)" : "UPI / Online"}`);
   draw(`Payment Status: ${order.paymentStatus.toUpperCase()}`);
 
   y -= 20;

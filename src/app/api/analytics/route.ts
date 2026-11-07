@@ -26,7 +26,7 @@ export async function GET() {
 
   const orders = (
     await Order.find({
-      shopId: "main",
+      shopId: session.shopId,
       createdAt: { $gte: since },
       paymentStatus: "paid",
       printStatus: { $ne: "cancelled" },

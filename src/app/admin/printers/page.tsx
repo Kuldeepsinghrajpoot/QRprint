@@ -2,20 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import type { PrinterDTO, PrinterHostDTO, AgentDTO, PaperSize } from "@/types/order";
-import FluentIcon from "@/components/lexical/FluentIcon";
-import {
-  Card,
-  CardHeader,
-  Chip,
-  Dialog,
-  Field,
-  GRADIENTS,
-  PageHero,
-  SelectField,
-  StatCard,
-  TextField,
-  type ChipColor,
-} from "@/components/lexical/ui";
+import LineIcon from "@/components/lexical/LineIcon";
+import { Card, CardHeader, Chip, Dialog, Field, SelectField, StatCard, TextField, Button, type ChipColor } from "@/components/lexical/ui";
 
 const ALL_PAPER_SIZES: PaperSize[] = ["A4", "A3", "Legal", "Letter", "Photo"];
 
@@ -143,8 +131,16 @@ export default function PrintersPage() {
   const hasPhotoPrinter = printers.some((p) => p.supportedPaperSizes?.includes("Photo"));
   const online = printers.filter((p) => p.status === "online").length;
   const attention = printers.filter((p) => isAttention(p.status)).length;
-  const pagesToday = printers.reduce((s, p) => s + (p.pagesPrintedToday ?? 0), 0);
-  const ordersToday = printers.reduce((s, p) => s + (p.ordersPrintedToday ?? 0), 0);
+  const offline = printers.filter((p) => p.status === "offline").length;
+  const count = (s: PrinterDTO["status"]) => printers.filter((p) => p.status === s).length;
+  const problemHint = [
+    count("paper_jam") && `${count("paper_jam")} paper jam`,
+    count("low_ink") && `${count("low_ink")} low ink`,
+    count("out_of_paper") && `${count("out_of_paper")} out of paper`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const hostCount = new Set(printers.flatMap((p) => (p.hosts ?? []).map((h) => h.hostname).filter(Boolean))).size;
 
   const list = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -163,38 +159,32 @@ export default function PrintersPage() {
 
   return (
     <div className="space-y-6">
-      <PageHero
-        icon={<FluentIcon name="printer" size={56} />}
-        gradient={GRADIENTS.teal}
-        title="Printers"
-        subtitle="Manage the printers your Print Agent(s) send jobs to."
-        action={{ label: "Add Printer", onClick: openForm }}
-      />
-
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard
-          icon={<FluentIcon name="printer" size={44} />}
+          icon={<LineIcon name="printer" size={24} />}
           label="Total Printers"
           value={String(printers.length)}
-          hint={`${online} online`}
+          hint={`${hostCount} computer${hostCount === 1 ? "" : "s"}`}
         />
         <StatCard
-          icon={<FluentIcon name="check-mark-button" size={44} />}
-          label="Online"
+          icon={<LineIcon name="ok" size={24} />}
+          label="Online Printers"
           value={String(online)}
-          hint="Ready to print"
+          hint={online ? "Ready to print" : "None online"}
         />
         <StatCard
-          icon={<FluentIcon name="warning" size={44} />}
-          label="Needs Attention"
+          icon={<LineIcon name="offline" size={24} />}
+          label="Offline Printers"
+          value={String(offline)}
+          hint={offline ? "Not connected" : "All connected"}
+          tone={offline ? "muted" : "default"}
+        />
+        <StatCard
+          icon={<LineIcon name="warn" size={24} />}
+          label="Problem Printers"
           value={String(attention)}
-          hint={attention ? "Jam, ink or paper issue" : "All printers healthy"}
-        />
-        <StatCard
-          icon={<FluentIcon name="bar-chart" size={44} />}
-          label="Pages Today"
-          value={String(pagesToday)}
-          hint={`${ordersToday} orders printed`}
+          hint={problemHint || "All printers healthy"}
+          tone={attention ? "danger" : "default"}
         />
       </div>
 
@@ -221,8 +211,8 @@ export default function PrintersPage() {
                 onClick={() => setFilter(f)}
                 className={`rounded-md border px-3.5 py-1 text-[13px] font-medium transition ${
                   filter === f
-                    ? "border-[#4F46E5] bg-[#4F46E5] text-white shadow-sm"
-                    : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                    ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-white"
+                    : "border-slate-300 text-slate-600 active:bg-slate-50"
                 }`}
               >
                 {f}
@@ -233,8 +223,11 @@ export default function PrintersPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search printers…"
-            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900/90 outline-none transition hover:border-slate-500 focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5] sm:w-64"
+            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900/90 outline-none transition focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)] sm:w-64"
           />
+          <Button onClick={openForm} className="w-full sm:w-auto">
+            Add Printer
+          </Button>
         </div>
       </Card>
 
@@ -285,14 +278,14 @@ export default function PrintersPage() {
       {printers.length === 0 ? (
         <Card>
           <div className="flex flex-col items-center px-6 py-14 text-center">
-            <FluentIcon name="printer" size={64} />
+            <LineIcon name="printer" size={64} />
             <div className="mt-3 text-lg font-bold text-slate-900/90">No printers added yet</div>
             <p className="mt-1 max-w-sm text-sm text-slate-900/60">
               Add one, then point your Print Agent config at it.
             </p>
             <button
               onClick={openForm}
-              className="mt-5 rounded-lg bg-[#4F46E5] px-5 py-2 text-sm font-medium text-white shadow transition hover:bg-[#4338CA]"
+              className="mt-5 rounded-lg bg-[color:var(--accent)] px-5 py-2 text-sm font-medium text-white transition active:bg-[color:var(--accent-dark)]"
             >
               + Add Printer
             </button>
@@ -323,7 +316,7 @@ export default function PrintersPage() {
                               : "rgba(100,116,139,0.16)",
                       }}
                     >
-                      <FluentIcon name="printer" size={26} />
+                      <LineIcon name="printer" size={26} />
                     </div>
                     <div className="min-w-0 grow">
                       <div className="flex items-center gap-1.5">
@@ -388,7 +381,7 @@ export default function PrintersPage() {
                   <div className="mt-auto flex justify-end pt-1">
                     <button
                       onClick={() => setToRemove(p)}
-                      className="rounded-md border border-[#F43F5E]/60 px-3 py-1 text-[13px] font-medium text-[#E11D48] transition hover:bg-[#F43F5E]/10"
+                      className="rounded-md border border-[#F43F5E]/60 px-3 py-1 text-[13px] font-medium text-[#E11D48] transition active:bg-[#F43F5E]/10"
                     >
                       Remove
                     </button>
@@ -404,8 +397,8 @@ export default function PrintersPage() {
       <Dialog open={showForm} onClose={() => setShowForm(false)}>
         <form onSubmit={handleAdd}>
           <div className="flex items-center gap-3 px-6 pb-2 pt-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "rgba(79,70,229,0.16)" }}>
-              <FluentIcon name="printer" size={28} />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "rgb(var(--accent-rgb) / 0.16)" }}>
+              <LineIcon name="printer" size={24} />
             </div>
             <div>
               <div className="text-xl font-semibold text-slate-900/90">Add Printer</div>
@@ -448,8 +441,8 @@ export default function PrintersPage() {
                       onClick={() => togglePaperSize(size)}
                       className={`rounded-full border px-3.5 py-1 text-[13px] font-medium transition ${
                         on
-                          ? "border-[#4F46E5] bg-[#4F46E5] text-white"
-                          : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                          ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-white"
+                          : "border-slate-300 bg-white text-slate-600 active:bg-slate-50"
                       }`}
                     >
                       {size === "Photo" ? "📷 Photo" : size}
@@ -468,14 +461,14 @@ export default function PrintersPage() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 transition active:bg-slate-100"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-lg bg-[#4F46E5] px-5 py-2 text-sm font-medium text-white shadow transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="rounded-lg bg-[color:var(--accent)] px-5 py-2 text-sm font-medium text-white transition active:bg-[color:var(--accent-dark)] disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {saving ? "Saving…" : "Add Printer"}
             </button>
@@ -495,13 +488,13 @@ export default function PrintersPage() {
         <div className="flex justify-end gap-2 px-6 pb-5 pt-4">
           <button
             onClick={() => setToRemove(null)}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 transition active:bg-slate-100"
           >
             Cancel
           </button>
           <button
             onClick={handleDelete}
-            className="rounded-lg bg-[#F43F5E] px-5 py-2 text-sm font-medium text-white shadow transition hover:bg-[#E11D48]"
+            className="rounded-lg bg-[#F43F5E] px-5 py-2 text-sm font-medium text-white transition active:bg-[#E11D48]"
           >
             Remove
           </button>

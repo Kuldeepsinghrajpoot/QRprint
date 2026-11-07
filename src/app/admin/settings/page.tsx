@@ -1,30 +1,75 @@
 "use client";
 
+import PalettePicker from "@/components/PalettePicker";
 import { useEffect, useState, useCallback } from "react";
-import type { PricingConfigDTO, PaperSize, PrintType } from "@/types/order";
-import FluentIcon from "@/components/lexical/FluentIcon";
-import {
-  Alert,
-  Button,
-  Card,
-  CardHeader,
-  CellInput,
-  Chip,
-  GRADIENTS,
-  NumberField,
-  PageHero,
-  Switch,
-  TextField,
-} from "@/components/lexical/ui";
-
-const PAPER_SIZES: PaperSize[] = ["A4", "A3", "Legal", "Letter", "Photo"];
-const PRINT_TYPES: PrintType[] = ["bw", "color"];
+import type { PricingConfigDTO } from "@/types/order";
+import LineIcon from "@/components/lexical/LineIcon";
+import AgentKeyBox from "@/components/AgentKeyBox";
+import TeamCard from "@/components/TeamCard";
+import ChangePasswordCard from "@/components/ChangePasswordCard";
+import { Alert, Button, Card, CardHeader, Switch, TextField } from "@/components/lexical/ui";
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<PricingConfigDTO | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [keyHint, setKeyHint] = useState<string | null>(null);
+  const [newKey, setNewKey] = useState<string | null>(null);
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [shop, setShop] = useState<{ slug: string; url: string; subAddressesEnabled: boolean; urlTemplate: string } | null>(null);
+  const [slugInput, setSlugInput] = useState("");
+  const [slugMsg, setSlugMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [slugBusy, setSlugBusy] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/shop", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        setShop(d);
+        setSlugInput(d.slug || "");
+      })
+      .catch(() => {});
+  }, []);
+
+  async function saveSlug() {
+    if (shop?.slug && shop.slug !== slugInput && !window.confirm("Change your shop address? Your already-printed QR codes will keep working, but new prints will use the new address.")) return;
+    setSlugBusy(true);
+    setSlugMsg(null);
+    try {
+      const res = await fetch("/api/shop", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: slugInput }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save");
+      setShop((s) => (s ? { ...s, slug: data.slug, url: data.url } : s));
+      setSlugMsg({ ok: true, text: "Saved. Download the new QR code from Shop QR Code." });
+    } catch (e) {
+      setSlugMsg({ ok: false, text: e instanceof Error ? e.message : "Could not save" });
+    } finally {
+      setSlugBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    fetch("/api/shop/agent-key", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setKeyHint(d.hasKey ? d.hint || "" : null))
+      .catch(() => {});
+  }, [newKey]);
+
+  async function createAgentKey() {
+    if (keyHint !== null && !window.confirm("Create a new key? The current key stops working, so you must paste the new one into the Print Agent on every PC.")) return;
+    setKeyBusy(true);
+    try {
+      const res = await fetch("/api/shop/agent-key", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not create key");
+      setNewKey(data.agentKey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create key");
+    } finally {
+      setKeyBusy(false);
+    }
+  }
 
   const load = useCallback(async () => {
     const res = await fetch("/api/settings/pricing", { cache: "no-store" });
@@ -35,20 +80,6 @@ export default function SettingsPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load
     load();
   }, [load]);
-
-  function updateRate(size: PaperSize, type: PrintType, field: "page1" | "page2to10" | "page11plus", value: number) {
-    if (!config) return;
-    setConfig({
-      ...config,
-      rates: {
-        ...config.rates,
-        [size]: {
-          ...config.rates[size],
-          [type]: { ...config.rates[size][type], [field]: value },
-        },
-      },
-    });
-  }
 
   async function handleSave() {
     if (!config) return;
@@ -76,7 +107,7 @@ export default function SettingsPage() {
   if (!config) {
     return (
       <div className="flex items-center justify-center gap-3 py-24 text-sm text-slate-900/60">
-        <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#4F46E5] border-t-transparent" />
+        <span className="h-5 w-5 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
         Loading settings…
       </div>
     );
@@ -84,14 +115,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHero
-        icon={<FluentIcon name="gear" size={56} />}
-        gradient={GRADIENTS.orange}
-        title="Pricing & Settings"
-        subtitle="Changes apply instantly to the customer upload page."
-        action={{ label: saving ? "Saving…" : "Save Changes", icon: "💾", onClick: handleSave, disabled: saving }}
-      />
-
       {error && (
         <Alert tone="error" icon="⚠️">
           {error}
@@ -99,91 +122,66 @@ export default function SettingsPage() {
       )}
       {saved && (
         <Alert tone="success" icon="✅">
-          Settings saved — the customer page is already using the new prices.
+          Settings saved.
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <Card>
+        <div className="p-4 sm:p-6">
+          <PalettePicker />
+        </div>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {/* Shop */}
         <Card>
-          <CardHeader icon={<FluentIcon name="printer" size={30} />} title="Shop" subtitle="Shown on the customer page" />
+          <CardHeader icon={<LineIcon name="printer" size={24} />} title="Shop" subtitle="Shown on the customer page" />
           <div className="px-6 pb-6">
             <TextField label="Shop Name" value={config.shopName} onChange={(v) => setConfig({ ...config, shopName: v })} />
           </div>
         </Card>
 
-        {/* Extra charges */}
-        <div className="xl:col-span-2">
-          <Card className="h-full">
-            <CardHeader icon={<FluentIcon name="money-bag" size={30} />} title="Discounts & Extra Charges" subtitle="Duplex, rush, binding and lamination" />
-            <div className="grid grid-cols-1 gap-5 px-6 pb-6 sm:grid-cols-2">
-              <NumberField label="Duplex discount (%)" value={config.duplexDiscountPercent} onChange={(v) => setConfig({ ...config, duplexDiscountPercent: v })} />
-              <NumberField label="Priority / rush fee (%)" value={config.priorityFeePercent} onChange={(v) => setConfig({ ...config, priorityFeePercent: v })} />
-              <NumberField label="Spiral binding charge (₹ flat)" value={config.bindingSpiralCharge} onChange={(v) => setConfig({ ...config, bindingSpiralCharge: v })} />
-              <NumberField label="Lamination charge (₹ per page)" value={config.bindingLaminationCharge} onChange={(v) => setConfig({ ...config, bindingLaminationCharge: v })} />
+        {/* Shop address */}
+        {shop?.subAddressesEnabled && (
+          <Card>
+            <CardHeader icon={<LineIcon name="qr" size={24} />} title="Shop address" subtitle="The web address your customers open" />
+            <div className="space-y-3 px-6 pb-6">
+              <TextField
+                label="Shop address"
+                value={slugInput}
+                onChange={(v) => setSlugInput(v.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                helper={slugInput ? shop.urlTemplate.replace("{slug}", slugInput).replace(/^https?:\/\//, "") : ""}
+              />
+              {slugMsg && <p className={`text-xs ${slugMsg.ok ? "text-emerald-600" : "text-red-600"}`}>{slugMsg.text}</p>}
+              <Button variant="light" onClick={saveSlug} disabled={slugBusy || !slugInput || slugInput === shop.slug}>
+                {slugBusy ? "Saving…" : shop.slug ? "Change address" : "Set address"}
+              </Button>
             </div>
           </Card>
-        </div>
-      </div>
+        )}
 
-      {/* Tiered pricing table */}
-      <Card>
-        <CardHeader icon={<FluentIcon name="ledger" size={30} />} title="Tiered Pricing (₹ per page)" subtitle="Price per page changes as the page count grows" />
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead>
-              <tr className="bg-[#F8FAFC] text-left text-xs font-semibold uppercase tracking-wide text-slate-900/60">
-                <th className="px-6 py-3">Paper Size</th>
-                <th className="px-3 py-3">Type</th>
-                <th className="px-3 py-3">Page 1</th>
-                <th className="px-3 py-3">Page 2–10</th>
-                <th className="px-3 py-3">Page 11+</th>
-              </tr>
-            </thead>
-            <tbody>
-              {PAPER_SIZES.map((size) =>
-                PRINT_TYPES.map((type) => (
-                  <tr key={`${size}-${type}`} className="border-t border-slate-900/[0.07] transition hover:bg-[#4F46E5]/[0.03]">
-                    <td className="px-6 py-2.5 font-semibold text-slate-900/90">
-                      {type === "bw" ? (size === "Photo" ? "📷 Photo" : size) : ""}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <Chip color={type === "bw" ? "secondary" : "primary"} small>
-                        {type === "bw" ? "B&W" : "Color"}
-                      </Chip>
-                    </td>
-                    {(["page1", "page2to10", "page11plus"] as const).map((field) => (
-                      <td key={field} className="px-3 py-2.5">
-                        <CellInput value={config.rates[size][type][field]} onChange={(v) => updateRate(size, type, field, v)} />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* GST & payments */}
+        {/* Print Agent connection */}
         <Card>
-          <CardHeader icon={<FluentIcon name="ledger" size={30} />} title="GST & Payments" subtitle="Tax and accepted payment methods" />
+          <CardHeader icon={<LineIcon name="printer" size={24} />} title="Print Agent" subtitle="Connect the desktop app to this account" />
           <div className="space-y-3 px-6 pb-6">
-            <Switch checked={config.gstEnabled} onChange={(v) => setConfig({ ...config, gstEnabled: v })} title="Enable GST" description="Adds GST to every order total" />
-            {config.gstEnabled && (
-              <div className="max-w-[200px]">
-                <NumberField label="GST %" value={config.gstPercent} onChange={(v) => setConfig({ ...config, gstPercent: v })} />
-              </div>
+            {newKey ? (
+              <AgentKeyBox agentKey={newKey} />
+            ) : (
+              <p className="text-sm text-slate-900/70">
+                {keyHint === null
+                  ? "No agent key yet. Create one, then paste it into the Print Agent on your shop PC."
+                  : `An agent key is active (ends in …${keyHint}). For safety it can't be shown again — create a new one if you lost it.`}
+              </p>
             )}
-            <Switch checked={config.cashPaymentEnabled} onChange={(v) => setConfig({ ...config, cashPaymentEnabled: v })} title="Accept Cash payments" description="Customer pays at the counter" />
-            <Switch checked={config.onlinePaymentEnabled} onChange={(v) => setConfig({ ...config, onlinePaymentEnabled: v })} title="Accept Online (UPI/Card) payments" description="Razorpay checkout on the customer page" />
+            <Button variant="light" onClick={createAgentKey} disabled={keyBusy}>
+              {keyBusy ? "Creating…" : keyHint === null ? "🔑 Create agent key" : "🔄 Create new key"}
+            </Button>
           </div>
         </Card>
 
         {/* Queue control */}
         <Card>
-          <CardHeader icon={<FluentIcon name="hourglass-not-done" size={30} />} title="Queue Control" subtitle="Lunch break or printer maintenance" />
+          <CardHeader icon={<LineIcon name="hour" size={24} />} title="Queue Control" subtitle="Lunch break or printer maintenance" />
           <div className="space-y-3 px-6 pb-6">
             <Switch
               checked={config.printingPaused}
@@ -196,7 +194,10 @@ export default function SettingsPage() {
             </p>
           </div>
         </Card>
+        <ChangePasswordCard />
       </div>
+
+      <TeamCard />
 
       {/* Sticky save bar */}
       <div className="sticky bottom-4 z-20">

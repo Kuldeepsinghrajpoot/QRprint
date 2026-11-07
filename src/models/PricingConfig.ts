@@ -28,6 +28,7 @@ export interface IPricingConfig extends Document {
   gstEnabled: boolean;
   gstPercent: number;
 
+  freePrinting: boolean; // no payment at all (college / office): orders go straight to the queue and earn no revenue
   cashPaymentEnabled: boolean;
   onlinePaymentEnabled: boolean;
 
@@ -35,6 +36,23 @@ export interface IPricingConfig extends Document {
   // picking up already-queued ones too (covers both "lunch break" and
   // "printer under maintenance" — in both cases nothing should print).
   printingPaused: boolean;
+
+  // ---- Shop Controls (dashboard page "Shop Controls") ----
+  autoPrint: boolean; // true: paid orders go to the printer by themselves; false: staff press "Print now" on each order
+  defaultColorPrinterId: string; // printer used for colour jobs that have no printer picked ("" = let the agent choose)
+  defaultBwPrinterId: string; // same for black & white jobs
+  openingHoursEnabled: boolean; // when on, customers can only place orders during the opening hours below
+  openTime: string; // "HH:MM" 24h, shop local time
+  closeTime: string; // "HH:MM"; earlier than openTime means the shop closes after midnight
+  openDays: number[]; // 0 = Sunday ... 6 = Saturday
+  timezone: string; // IANA name, e.g. "Asia/Kolkata"
+  minOrderAmount: number; // ₹, 0 = no minimum
+  maxPagesPerOrder: number; // 0 = no limit
+  maxActiveOrders: number; // waiting + printing orders at once, 0 = no limit
+  showWaitTime: boolean; // customers see "N orders ahead, about X min" on the order and tracking pages
+  requirePhone: boolean; // customer must enter a mobile number
+  customerNotice: string; // short message shown at the top of the customer page
+  cashAutoCancelMinutes: number; // unpaid cash orders are cancelled after this many minutes
 
   updatedAt: Date;
 }
@@ -81,10 +99,27 @@ const PricingConfigSchema = new Schema<IPricingConfig>(
     gstEnabled: { type: Boolean, default: false },
     gstPercent: { type: Number, default: 18 },
 
+    freePrinting: { type: Boolean, default: false },
     cashPaymentEnabled: { type: Boolean, default: true },
     onlinePaymentEnabled: { type: Boolean, default: true },
 
     printingPaused: { type: Boolean, default: false },
+
+    autoPrint: { type: Boolean, default: true },
+    defaultColorPrinterId: { type: String, default: "" },
+    defaultBwPrinterId: { type: String, default: "" },
+    openingHoursEnabled: { type: Boolean, default: false },
+    openTime: { type: String, default: "09:00" },
+    closeTime: { type: String, default: "21:00" },
+    openDays: { type: [Number], default: [0, 1, 2, 3, 4, 5, 6] },
+    timezone: { type: String, default: "Asia/Kolkata" },
+    minOrderAmount: { type: Number, default: 0 },
+    maxPagesPerOrder: { type: Number, default: 0 },
+    maxActiveOrders: { type: Number, default: 0 },
+    showWaitTime: { type: Boolean, default: true },
+    requirePhone: { type: Boolean, default: false },
+    customerNotice: { type: String, default: "" },
+    cashAutoCancelMinutes: { type: Number, default: 20 },
   },
   { timestamps: { createdAt: false, updatedAt: true } }
 );

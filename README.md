@@ -112,3 +112,34 @@ Push to GitHub → import on vercel.com (auto-detects Next.js) → add the same 
 - **Multi-printer routing & special paper**: the agent picks a printer for each order — staff's manual assignment (dashboard dropdown) first, then a type-matched printer (B&W/Color), then a configured default. Orders using **non-A4 paper (Photo/A3/Legal)** are deliberately held back from auto-printing until a staff member manually assigns a printer from the dashboard — the Live Queue shows an amber alert banner and a per-order "📄 Needs X paper" badge for these, since no software can physically swap a printer's paper tray. Plain A4 jobs still print automatically. With multiple printers, the agent processes each printer's queue in parallel, so one busy printer doesn't stall the others. **Word docs and ZIP files are never sent to the agent** either — `pdf-to-printer`/SumatraPDF has no reliable way to silently print those formats — so these orders wait in the queue with a badge until staff open and print them manually from their own PC, then mark the order ready.
 - **Duplicate-print protection**: if two agent instances ever poll at the same time (e.g. the agent accidentally installed on two PCs), the `queued → printing` transition is an atomic, conditional database update — only one of them can "claim" a given order, so the same file can never print twice. If an order ever gets stuck mid-print (rare network-drop edge case), staff can resolve it manually with the "Mark Ready (manual)" button on that order's card.
 - **Single-shop model**: all data currently uses `shopId: "main"`. Multi-shop/franchise support would mean deriving `shopId` from the logged-in user/subdomain instead of hardcoding it.
+
+
+## Landing page (Chhapo)
+
+`/` now serves two things (see `src/app/page.tsx`):
+
+- **Main address, no shop** (e.g. `qr.lexicalsoftware.in/`) -> the marketing landing page (`src/components/landing/`).
+- **A shop sub-address** (`ravi-xerox.qr.lexicalsoftware.in`) **or an old `/?shop=<id>` link** -> the customer upload page (`src/components/CustomerOrder.tsx`, the former `page.tsx`).
+
+Landing buttons use the real auth: the header "Login" popup calls `/api/auth/login` and opens `/admin`; "Start free trial" goes to `/signup`.
+Edit brand name, WhatsApp number, email and address in `src/components/landing/site.ts`, and the plans in the `plans` array in `Landing.tsx` (display only, no billing is wired).
+Locally, test the customer page with `http://localhost:3000/?shop=main`.
+
+## File cleanup and cancel secret
+
+- Customer files are deleted when an order is collected or cancelled. `src/lib/fileCleanup.ts` also removes files of failed or
+  ready-but-uncollected orders and uploads that never became an order after `FILE_RETENTION_HOURS` (default 24). It runs from the
+  dashboard's order polling (at most every 10 minutes) and from `GET /api/cron/cleanup` (set `CRON_SECRET`, call it hourly).
+- Placing an order returns a one-time `cancelKey`. Cancelling an order needs it, so knowing an order id is not enough.
+- API errors return a generic message in production and the details go to the server log (`src/lib/apiError.ts`).
+
+
+## Order History, new-order alert and team logins
+
+- **Order History** (`/admin/orders`): every order, not only the latest 200 of the Live Queue. Search by name, phone or token, filter by date range
+  (today / 7 / 30 days / custom), print status, payment status and cash or online, page through the results, and **Export CSV** for Excel or your accountant
+  (up to 5,000 rows, in the shop timezone). The four cards on top (orders, revenue, cash, online) follow the filters. API: `GET /api/orders/history`, `GET /api/orders/export`.
+- **Live Queue**: a *New-order alert* switch (beep, banner and a count in the browser tab title when the tab is in the background; remembered per device)
+  and a search box (name, phone or token).
+- **Team** (Settings, owner only): add up to 10 staff logins, reset their password, remove them. Staff can run the queue, printers and order history,
+  but not settings, the team list or "refunded". API: `/api/team`, `/api/team/:id`.

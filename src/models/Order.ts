@@ -3,7 +3,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 export type PrintType = "bw" | "color";
 export type PaperSize = "A4" | "A3" | "Legal" | "Letter" | "Photo";
 export type BindingType = "none" | "spiral" | "lamination";
-export type PaymentMethod = "cash" | "online";
+export type PaymentMethod = "cash" | "online" | "free";
 export type PaymentStatus = "pending" | "paid" | "refunded";
 export type PrintStatus = "queued" | "printing" | "ready" | "collected" | "failed" | "cancelled";
 
@@ -19,6 +19,7 @@ export interface IOrder extends Document {
   // (no reliable Windows print path for .docx/.zip), so staff open and
   // print them manually, then mark the order ready themselves.
   requiresManualPrint: boolean;
+  approvedForPrint?: boolean; // set by staff ("Print now") when the shop has auto-print switched off
 
   printType: PrintType;
   paperSize: PaperSize;
@@ -45,6 +46,9 @@ export interface IOrder extends Document {
   printedOn?: string; // Windows printer name it was sent to
   razorpayPaymentId?: string;
   cancelledAt?: Date;
+  cancelledBy?: "customer" | "shop";
+  cancelReason?: string;
+  cancelKeyHash?: string; // hash of the secret the customer needs to cancel this order
 
   createdAt: Date;
   updatedAt: Date;
@@ -60,6 +64,7 @@ const OrderSchema = new Schema<IOrder>(
     fileKey: { type: String },
     fileName: { type: String },
     requiresManualPrint: { type: Boolean, default: false },
+    approvedForPrint: { type: Boolean, default: false },
 
     printType: { type: String, enum: ["bw", "color"], required: true },
     paperSize: { type: String, enum: ["A4", "A3", "Legal", "Letter", "Photo"], default: "A4" },
@@ -79,7 +84,7 @@ const OrderSchema = new Schema<IOrder>(
     gstAmount: { type: Number, default: 0 },
     totalPrice: { type: Number, required: true },
 
-    paymentMethod: { type: String, enum: ["cash", "online"], required: true },
+    paymentMethod: { type: String, enum: ["cash", "online", "free"], required: true },
     paymentStatus: { type: String, enum: ["pending", "paid", "refunded"], default: "pending" },
     printStatus: {
       type: String,
@@ -92,6 +97,9 @@ const OrderSchema = new Schema<IOrder>(
     printedOn: { type: String },
     razorpayPaymentId: { type: String, unique: true, sparse: true },
     cancelledAt: { type: Date },
+    cancelledBy: { type: String, enum: ["customer", "shop"] },
+    cancelReason: { type: String, maxlength: 200 },
+    cancelKeyHash: { type: String, select: false },
   },
   { timestamps: true }
 );

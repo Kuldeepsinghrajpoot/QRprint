@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import FluentIcon from "@/components/lexical/FluentIcon";
-import { Card, CardHeader, Chip, GRADIENTS, PageHero, StatCard } from "@/components/lexical/ui";
+import LineIcon from "@/components/lexical/LineIcon";
+import { Card, CardHeader, Chip, StatCard } from "@/components/lexical/ui";
 
 interface AnalyticsData {
   daily: { date: string; orders: number; revenue: number }[];
@@ -29,7 +29,7 @@ export default function AnalyticsPage() {
   if (!data) {
     return (
       <div className="flex items-center justify-center gap-3 py-24 text-sm text-slate-900/60">
-        <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#4F46E5] border-t-transparent" />
+        <span className="h-5 w-5 animate-spin rounded-full border-2 border-[color:var(--accent)] border-t-transparent" />
         Loading analytics…
       </div>
     );
@@ -45,18 +45,12 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHero
-        icon={<FluentIcon name="bar-chart" size={56} />}
-        gradient={GRADIENTS.purple}
-        title="Analytics"
-        subtitle="Last 14 days · paid orders only"
-      />
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={<FluentIcon name="clipboard" size={44} />} label="Orders" value={String(data.totals.orders)} hint="Last 14 days" />
-        <StatCard icon={<FluentIcon name="money-bag" size={44} />} label="Revenue" value={`₹${data.totals.revenue}`} hint="Paid orders" />
-        <StatCard icon={<FluentIcon name="printer" size={44} />} label="Pages Printed" value={String(data.totals.pages)} hint="All printers" />
-        <StatCard icon={<FluentIcon name="ledger" size={44} />} label="Avg. Order Value" value={`₹${data.totals.avgOrderValue}`} hint="Per paid order" />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatCard icon={<LineIcon name="list" size={24} />} label="Orders" value={String(data.totals.orders)} hint="Last 14 days" />
+        <StatCard icon={<LineIcon name="wallet" size={24} />} label="Revenue" value={`₹${data.totals.revenue}`} hint="Paid orders" />
+        <StatCard icon={<LineIcon name="printer" size={24} />} label="Pages Printed" value={String(data.totals.pages)} hint="All printers" />
+        <StatCard icon={<LineIcon name="files" size={24} />} label="Avg. Order Value" value={`₹${data.totals.avgOrderValue}`} hint="Per paid order" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -64,7 +58,7 @@ export default function AnalyticsPage() {
         <div className="lg:col-span-2">
           <Card className="h-full">
             <CardHeader
-              icon={<FluentIcon name="bar-chart" size={30} />}
+              icon={<LineIcon name="bar" size={24} />}
               title="Revenue — Last 14 Days"
               subtitle="Hover a bar to see the day's orders"
             />
@@ -85,7 +79,7 @@ export default function AnalyticsPage() {
                         className="w-full rounded-t-md transition group-hover:brightness-110"
                         style={{
                           height: `${Math.max(2, (d.revenue / maxRevenue) * 100)}%`,
-                          background: "linear-gradient(180deg, #6366F1 0%, #4F46E5 100%)",
+                          background: "linear-gradient(180deg, var(--accent-light) 0%, var(--accent) 100%)",
                         }}
                       />
                       <div className="pointer-events-none absolute -top-12 left-1/2 z-10 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-[11px] text-white shadow-lg group-hover:block">
@@ -109,12 +103,12 @@ export default function AnalyticsPage() {
 
         {/* Print type donut */}
         <Card className="h-full">
-          <CardHeader icon={<FluentIcon name="printer" size={30} />} title="Print Type Split" subtitle="B&W vs Color" />
+          <CardHeader icon={<LineIcon name="printer" size={24} />} title="Print Type Split" subtitle="B&W vs Color" />
           <div className="flex flex-col items-center gap-5 px-6 pb-6">
             <div
               className="relative h-44 w-44 rounded-full"
               style={{
-                background: `conic-gradient(#334155 0 ${bwPct}%, #6366F1 ${bwPct}% 100%)`,
+                background: `conic-gradient(#334155 0 ${bwPct}%, var(--accent-light) ${bwPct}% 100%)`,
               }}
             >
               <div className="absolute inset-[22px] flex flex-col items-center justify-center rounded-full bg-white">
@@ -147,7 +141,7 @@ export default function AnalyticsPage() {
       {/* Peak hours */}
       <Card>
         <CardHeader
-          icon={<FluentIcon name="hourglass-not-done" size={30} />}
+          icon={<LineIcon name="hour" size={24} />}
           title="Peak Hours"
           subtitle="When customers order the most"
           action={hasHourData ? <Chip color="primary">Busiest: {fmtHour(peakHour)}</Chip> : undefined}
@@ -160,7 +154,7 @@ export default function AnalyticsPage() {
                   className="w-full rounded-t-sm transition"
                   style={{
                     height: `${c ? Math.max(4, (c / maxHour) * 100) : 0}%`,
-                    background: hour === peakHour && hasHourData ? "#4F46E5" : "#A5B4FC",
+                    background: hour === peakHour && hasHourData ? "var(--accent)" : "#A5B4FC",
                   }}
                 />
                 <div className="pointer-events-none absolute -top-9 left-1/2 z-10 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] text-white shadow-lg group-hover:block">

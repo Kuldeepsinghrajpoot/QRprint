@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { slugFromHostname } from "@/lib/shopUrl";
 import {
   composeCollage,
   composeTextOverlay,
@@ -14,6 +15,18 @@ import {
 } from "@/lib/photoTools";
 
 type Mode = "collage" | "text" | "batch" | "idcard";
+
+/** Where "back to the upload page" goes. On the main address the shop lives in ?shop=, which "/" alone would lose
+ *  (the main address now shows the landing page when no shop is given). */
+function customerHome(): string {
+  try {
+    const shop = sessionStorage.getItem("qrprint_shop");
+    if (shop && !slugFromHostname(window.location.hostname)) return `/${encodeURIComponent(shop)}`;
+  } catch {
+    /* storage blocked */
+  }
+  return "/";
+}
 
 export default function PhotoToolsPage() {
   const router = useRouter();
@@ -94,7 +107,7 @@ export default function PhotoToolsPage() {
     const reader = new FileReader();
     reader.onload = () => {
       sessionStorage.setItem("qrprint_photo_tool_result", reader.result as string);
-      router.push("/");
+      router.push(customerHome());
     };
     reader.readAsDataURL(previewBlob);
   }
@@ -222,7 +235,14 @@ export default function PhotoToolsPage() {
             </div>
           )}
 
-          <Link href="/" className="btn-secondary block text-center">
+          <Link
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              router.push(customerHome());
+            }}
+            className="btn-secondary block text-center"
+          >
             ← Back to normal upload
           </Link>
         </div>

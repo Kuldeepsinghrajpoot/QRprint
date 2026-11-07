@@ -1,16 +1,21 @@
+import { serverError } from "@/lib/apiError";
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
-import { verifyAgentKey } from "@/lib/agentAuth";
+import { getAgentShopId } from "@/lib/agentAuth";
 import { sendOrderNotification, readyMessage } from "@/lib/notify";
 
 export const runtime = "nodejs";
 
 const schema = z.object({
   printStatus: z.enum(["printing", "ready", "failed"]),
-  printerError: z.string().optional(),
-  printerId: z.string().optional(),
+  printerError: z.string().max(500).optional(),
+  printerId: z
+    .string()
+    .refine((v) => mongoose.isValidObjectId(v), "Invalid printer id")
+    .optional(),
   // Which computer / printer is doing the job (shown in the Live Queue)
   agentId: z.string().trim().max(100).optional(),
   printedOn: z.string().trim().max(200).optional(),
@@ -29,7 +34,8 @@ const schema = z.object({
  *  - "failed" if the printer errors out (jam, offline, etc.)
  */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!verifyAgentKey(req)) {
+  const shopId = await getAgentShopId(req);
+  if (!shopId) {
     return NextResponse.json({ error: "Invalid or missing agent key" }, { status: 401 });
   }
 
@@ -51,9 +57,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (parsed.data.printStatus === "printing") {
       // Atomic claim: only transition queued -> printing. If another agent
       // already claimed this order, findOneAndUpdate matches nothing here.
-      order = await Order.findOneAndUpdate({ _id: id, printStatus: "queued" }, update, { new: true });
+      order = await Order.findOneAndUpdate({ _id: id, shopId, printStatus: "queued" }, update, { new: true });
       if (!order) {
-        const existing = await Order.findById(id);
+        const existing = await Order.findOne({ _id: id, shopId });
         if (!existing) return NextResponse.json({ error: "Order not found" }, { status: 404 });
         return NextResponse.json(
           { error: "Order already claimed by another agent/printer", printStatus: existing.printStatus },
@@ -61,8 +67,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         );
       }
     } else {
-      order = await Order.findByIdAndUpdate(id, update, { new: true });
-      if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      // A cancelled order stays cancelled: if the shop cancelled it while it was printing, the agent's later
+      // "ready"/"failed" report must not bring it back (or send a "ready" message to the customer).
+      order = await Order.findOneAndUpdate({ _id: id, shopId, printStatus: { $ne: "cancelled" } }, update, { new: true });
+      if (!order) {
+        const existing = await Order.findOne({ _id: id, shopId });
+        if (!existing) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+        return NextResponse.json(existing);
+      }
     }
 
     if (parsed.data.printStatus === "ready") {
@@ -75,7 +87,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return NextResponse.json(order);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to update status";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, "Failed to update status");
   }
 }

@@ -4,25 +4,26 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 /**
  * Tailwind port of the Lexical Software (Materio / MUI) building blocks.
- * Palette: Royal Indigo #4F46E5 + Slate. Font: Public Sans.
+ * Palette: theme accent (see globals.css) + Slate. Font: Public Sans.
  */
 
 export const LEX_FONT = "'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
 
+// Every page banner uses the same blue as the landing page.
+const BLUE = "linear-gradient(120deg, var(--accent-dark) 0%, var(--accent) 55%, var(--accent-light) 100%)";
 export const GRADIENTS = {
-  indigo: "linear-gradient(120deg, #312E81 0%, #4F46E5 55%, #6366F1 100%)",
-  teal: "linear-gradient(120deg, #0F766E 0%, #0D9488 60%, #2DD4BF 100%)",
-  purple: "linear-gradient(120deg, #5B21B6 0%, #7C3AED 55%, #A78BFA 100%)",
-  orange: "linear-gradient(120deg, #9A3412 0%, #EA580C 55%, #FB923C 100%)",
-  blue: "linear-gradient(120deg, #1E3A8A 0%, #2563EB 55%, #60A5FA 100%)",
+  indigo: BLUE,
+  teal: BLUE,
+  purple: BLUE,
+  orange: BLUE,
+  blue: BLUE,
 } as const;
 
-export const CARD_SHADOW =
-  "0px 3px 9px 1px rgba(51,48,60,0.03), 0px 8px 9px 0px rgba(51,48,60,0.02), 0px 1px 6px 4px rgba(51,48,60,0.01)";
+// Cards are flat: no shadow, just a thin light border.
+export const CARD_BORDER = "border border-slate-200";
 
-// Same shadow as a Tailwind class (so :hover can override it without !important).
-const CARD_SHADOW_CLASS =
-  "shadow-[0px_3px_9px_1px_rgba(51,48,60,0.03),0px_8px_9px_0px_rgba(51,48,60,0.02),0px_1px_6px_4px_rgba(51,48,60,0.01)]";
+// Plain, calm page background behind every dashboard / sign-in page.
+export const PAGE_BG = "#F6F8F7";
 
 /* ───────────────────────── Card ───────────────────────── */
 
@@ -37,8 +38,8 @@ export function Card({
 }) {
   return (
     <div
-      className={`bg-white rounded-[10px] ${CARD_SHADOW_CLASS} ${
-        hover ? "transition duration-150 hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(79,70,229,0.14)]" : ""
+      className={`bg-white rounded-[10px] ${CARD_BORDER} ${
+        hover ? "transition duration-150 " : ""
       } ${className}`}
     >
       {children}
@@ -73,66 +74,33 @@ export function CardHeader({
 
 /* ───────────────────────── Hero / stats ───────────────────────── */
 
-export function PageHero({
-  icon,
-  title,
-  subtitle,
-  gradient = GRADIENTS.indigo,
-  action,
-}: {
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-  gradient?: string;
-  action?: { label: string; onClick: () => void; icon?: string; disabled?: boolean };
-}) {
-  return (
-    <div
-      className="flex flex-wrap items-center justify-between gap-4 rounded-[10px] p-6 text-white"
-      style={{ background: gradient, boxShadow: CARD_SHADOW }}
-    >
-      <div className="flex items-center gap-4">
-        <div className="flex shrink-0 items-center">{icon}</div>
-        <div>
-          <h1 className="text-[1.5rem] font-extrabold leading-tight text-white sm:text-[2.125rem]">{title}</h1>
-          <p className="mt-1 text-sm" style={{ color: "rgba(255,255,255,0.88)" }}>
-            {subtitle}
-          </p>
-        </div>
-      </div>
-      {action && (
-        <button
-          onClick={action.onClick}
-          disabled={action.disabled}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-white px-5 py-[7px] text-[0.9375rem] font-medium text-slate-800 shadow transition hover:bg-slate-100 disabled:opacity-60"
-        >
-          <span className="text-base leading-none">{action.icon ?? "+"}</span>
-          {action.label}
-        </button>
-      )}
-    </div>
-  );
-}
-
 export function StatCard({
   icon,
   label,
   value,
   hint,
+  tone = "default",
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   hint?: string;
+  /** "muted" for offline/neutral, "danger" for problems. */
+  tone?: "default" | "muted" | "danger";
 }) {
+  const tile = {
+    default: "bg-[rgb(var(--accent-rgb)/0.08)] text-[color:var(--accent)]",
+    muted: "bg-slate-100 text-slate-500",
+    danger: "bg-rose-50 text-rose-600",
+  }[tone];
   return (
     <Card>
-      <div className="flex items-center gap-3 p-6">
-        {icon}
+      <div className="flex items-start gap-3 p-4 sm:p-5">
+        <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-md ${tile}`}>{icon}</span>
         <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-900/60">{label}</div>
-          <div className="text-2xl font-extrabold leading-tight text-slate-900/90">{value}</div>
-          {hint && <div className="text-xs text-slate-900/60">{hint}</div>}
+          <div className="truncate text-xs font-semibold uppercase tracking-wide text-slate-900/55">{label}</div>
+          <div className="mt-0.5 text-2xl font-extrabold leading-tight text-slate-900/90">{value}</div>
+          {hint && <div className="mt-0.5 text-xs text-slate-900/55">{hint}</div>}
         </div>
       </div>
     </Card>
@@ -144,7 +112,7 @@ export function StatCard({
 export type Tone = "primary" | "success" | "warning" | "error" | "secondary" | "purple" | "info";
 
 export const TONES: Record<Tone, { bg: string; fg: string; main: string }> = {
-  primary: { bg: "rgba(79,70,229,0.16)", fg: "#4F46E5", main: "#4F46E5" },
+  primary: { bg: "rgb(var(--accent-rgb) / 0.16)", fg: "var(--accent)", main: "var(--accent)" },
   success: { bg: "rgba(16,185,129,0.16)", fg: "#059669", main: "#10B981" },
   warning: { bg: "rgba(245,158,11,0.16)", fg: "#D97706", main: "#F59E0B" },
   error: { bg: "rgba(244,63,94,0.16)", fg: "#E11D48", main: "#F43F5E" },
@@ -168,7 +136,7 @@ export function Chip({
   const c = TONES[color];
   return (
     <span
-      className={`inline-flex items-center rounded-full font-medium whitespace-nowrap ${
+      className={`inline-flex items-center rounded-md font-medium whitespace-nowrap ${
         small ? "px-2 py-[1px] text-[11px]" : "px-3 py-[3px] text-[13px]"
       }`}
       style={{ background: c.bg, color: c.fg }}
@@ -222,7 +190,7 @@ export function Button({
   const pad = size === "sm" ? "px-3 py-1 text-[13px]" : "px-5 py-2 text-sm";
   const style =
     variant === "contained"
-      ? { background: c.main, color: "#fff", boxShadow: `0 2px 6px ${c.main}66` }
+      ? { background: c.main, color: "#fff" }
       : variant === "light"
         ? { background: c.bg, color: c.fg }
         : variant === "outlined"
@@ -232,7 +200,7 @@ export function Button({
     <button
       {...props}
       style={style}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 ${pad} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 ${pad} ${className}`}
     />
   );
 }
@@ -265,14 +233,16 @@ export function Switch({
   onChange,
   title,
   description,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   title: string;
   description?: string;
+  disabled?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-900/10 px-4 py-3">
+    <div className={`flex items-center justify-between gap-4 rounded-lg border border-slate-900/10 px-4 py-3 ${disabled ? "opacity-50" : ""}`}>
       <div className="min-w-0">
         <div className="text-sm font-semibold text-slate-900/90">{title}</div>
         {description && <div className="mt-0.5 text-xs text-slate-900/60">{description}</div>}
@@ -281,8 +251,10 @@ export function Switch({
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-disabled={disabled}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-[22px] w-[40px] shrink-0 rounded-full transition ${checked ? "bg-[#4F46E5]" : "bg-slate-300"}`}
+        className={`relative h-[22px] w-[40px] shrink-0 rounded-full transition disabled:cursor-not-allowed ${checked ? "bg-[color:var(--accent)]" : "bg-slate-300"}`}
       >
         <span
           className={`absolute top-[3px] h-4 w-4 rounded-full bg-white shadow transition-all ${checked ? "left-[21px]" : "left-[3px]"}`}
@@ -295,7 +267,7 @@ export function Switch({
 /* ───────────────────────── Inputs ───────────────────────── */
 
 const FIELD_CLS =
-  "w-full rounded-lg border border-slate-300 bg-white px-3.5 py-[13px] text-sm text-slate-900/90 outline-none transition hover:border-slate-500 focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]";
+  "w-full rounded-lg border border-slate-300 bg-white px-3.5 py-[13px] text-sm text-slate-900/90 outline-none transition focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)]";
 
 /** Outlined text field with a floating label, like MUI <TextField />. */
 export function TextField({
@@ -329,7 +301,7 @@ export function TextField({
           placeholder={placeholder ?? " "}
           className={`peer ${FIELD_CLS}`}
         />
-        <label className="pointer-events-none absolute left-2.5 top-0 -translate-y-1/2 bg-white px-1 text-xs text-slate-900/60 transition-all peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-sm peer-focus:top-0 peer-focus:text-xs peer-focus:text-[#4F46E5]">
+        <label className="pointer-events-none absolute left-2.5 top-0 -translate-y-1/2 bg-white px-1 text-xs text-slate-900/60 transition-all peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-sm peer-focus:top-0 peer-focus:text-xs peer-focus:text-[color:var(--accent)]">
           {label}
           {required && " *"}
         </label>
@@ -386,7 +358,7 @@ export function CellInput({ value, onChange }: { value: number; onChange: (v: nu
       min={0}
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900/90 outline-none transition hover:border-slate-500 focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
+      className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900/90 outline-none transition focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)]"
     />
   );
 }

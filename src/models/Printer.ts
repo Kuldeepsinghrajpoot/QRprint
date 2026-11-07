@@ -32,6 +32,8 @@ export interface IPrinter extends Document {
   status: PrinterStatus;
   lastSeenAt?: Date;
   hosts: IPrinterHost[]; // computers this printer is installed on (reported by their agents)
+  tonerYieldPages?: number; // pages one cartridge / ink refill prints; 0 or missing = supplies not tracked for this printer
+  tonerRefilledAt?: Date; // when the cartridge was last changed or refilled (pages are counted from here)
   ordersPrintedToday: number;
   createdAt: Date;
 }
@@ -76,6 +78,8 @@ const PrinterSchema = new Schema<IPrinter>(
     },
     lastSeenAt: { type: Date },
     hosts: { type: [PrinterHostSchema], default: [] },
+    tonerYieldPages: { type: Number, default: 0 },
+    tonerRefilledAt: { type: Date },
     ordersPrintedToday: { type: Number, default: 0 },
   },
   { timestamps: true }

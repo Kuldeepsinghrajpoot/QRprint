@@ -12,11 +12,12 @@ export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const shopId = session.shopId;
   await connectDB();
   const now = new Date();
   const [agents, printers] = await Promise.all([
-    Agent.find({ shopId: "main" }).sort({ hostname: 1 }).lean(),
-    Printer.find({ shopId: "main" }).select("name systemPrinterName hosts").lean(),
+    Agent.find({ shopId }).sort({ hostname: 1 }).lean(),
+    Printer.find({ shopId }).select("name systemPrinterName hosts").lean(),
   ]);
 
   return NextResponse.json(
@@ -37,6 +38,7 @@ export async function GET() {
             printerId: String(p._id),
             name: p.name,
             port: h.port,
+            portType: h.portType,
             ipAddress: h.ipAddress,
             tcpPort: h.tcpPort,
             status: isFresh(h, now) ? h.status : "offline",

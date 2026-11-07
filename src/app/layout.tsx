@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { PALETTE_INIT_SCRIPT } from "@/lib/palettes";
+import InlineScript from "@/components/InlineScript";
 
 export const metadata: Metadata = {
   title: "QRtoPrint — Upload & Print",
@@ -8,7 +10,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        <InlineScript code={PALETTE_INIT_SCRIPT} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

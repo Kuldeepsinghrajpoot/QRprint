@@ -52,3 +52,7 @@ export function readyMessage(customerName: string, token: string): string {
 export function orderPlacedMessage(customerName: string, token: string): string {
   return `Hi ${customerName}, your print order #${token} has been placed. We'll notify you when it's ready.`;
 }
+
+export function cancelledMessage(customerName: string, token: string, refund: boolean): string {
+  return `Hi ${customerName}, your print order #${token} was cancelled by the shop.${refund ? " Your payment will be refunded." : ""} Please check with the counter if you have questions.`;
+}

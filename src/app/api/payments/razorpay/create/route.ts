@@ -1,13 +1,20 @@
+import { serverError } from "@/lib/apiError";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createRazorpayOrder, isRazorpayConfigured } from "@/lib/razorpay";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
+import { connectDB } from "@/lib/mongodb";
+import { Order } from "@/models/Order";
+import { PricingConfig } from "@/models/PricingConfig";
+import { resolveShopId } from "@/lib/shop";
+import { shopOpenStatus } from "@/lib/shopHours";
 
 export const runtime = "nodejs";
 
 const schema = z.object({
   amount: z.number().positive().max(100000),
   receipt: z.string().min(1).max(40),
+  shop: z.string().trim().max(40).optional(),
 });
 
 /**
@@ -37,6 +44,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
+    // Don't take money for an order the shop would refuse anyway (closed, or too many orders waiting).
+    await connectDB();
+    const shopId = await resolveShopId(parsed.data.shop);
+    const cfg = shopId ? await PricingConfig.findOne({ shopId }) : null;
+    if (cfg) {
+      const hours = shopOpenStatus(cfg);
+      if (!hours.open) return NextResponse.json({ error: hours.message }, { status: 503 });
+      if (cfg.maxActiveOrders > 0 && (await Order.countDocuments({ shopId, printStatus: { $in: ["queued", "printing"] } })) >= cfg.maxActiveOrders) {
+        return NextResponse.json({ error: "The shop is very busy right now. Please try again in a few minutes." }, { status: 503 });
+      }
+    }
+
     const order = await createRazorpayOrder(parsed.data.amount, parsed.data.receipt);
     return NextResponse.json({
       configured: true,
@@ -46,7 +65,6 @@ export async function POST(req: NextRequest) {
       keyId: process.env.RAZORPAY_KEY_ID,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to create Razorpay order";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, "Failed to create Razorpay order");
   }
 }

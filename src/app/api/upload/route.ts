@@ -1,3 +1,4 @@
+import { serverError } from "@/lib/apiError";
 import { NextRequest, NextResponse } from "next/server";
 import { uploadFile } from "@/lib/storage";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
@@ -53,7 +54,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ fileKey: key, fileUrl: url, fileName: file.name });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Upload failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, "Upload failed");
   }
 }

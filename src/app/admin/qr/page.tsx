@@ -1,109 +1,84 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import FluentIcon from "@/components/lexical/FluentIcon";
-import { Alert, Card, CardHeader, GRADIENTS, PageHero } from "@/components/lexical/ui";
+import Link from "next/link";
+import { Button, Card } from "@/components/lexical/ui";
 
-const STEPS = [
-  { icon: "🖨️", title: "Print the QR", text: "Download the PNG and print it at A5 size or bigger." },
-  { icon: "🪪", title: "Laminate & stick", text: "Laminate it and place it on the counter or shop window." },
-  { icon: "📱", title: "Customers scan", text: "They scan with the phone camera, upload the file and pay." },
-];
+interface ShopInfo {
+  name: string;
+  slug: string;
+  url: string;
+}
 
 export default function QrPage() {
-  const [qrUrl, setQrUrl] = useState<string | null>(null);
-  const [appUrl, setAppUrl] = useState("");
+  const [shop, setShop] = useState<ShopInfo | null>(null);
+  const [qrUrl] = useState(() => `/api/qr?t=${Date.now()}`);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reading window.location requires the client-only effect
-    setAppUrl(process.env.NEXT_PUBLIC_APP_URL || window.location.origin);
-    setQrUrl(`/api/qr?t=${Date.now()}`);
+    fetch("/api/shop", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setShop({ name: d.name || "", slug: d.slug || "", url: d.url || window.location.origin }))
+      .catch(() => setShop({ name: "", slug: "", url: window.location.origin }));
   }, []);
 
   async function copyLink() {
+    if (!shop) return;
     try {
-      await navigator.clipboard.writeText(`${appUrl}/`);
+      await navigator.clipboard.writeText(shop.url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // clipboard blocked — user can still select the text
+      // clipboard blocked: the link is still selectable on screen
     }
   }
 
   return (
-    <div className="space-y-6">
-      <PageHero
-        icon={<FluentIcon name="link" size={56} />}
-        gradient={GRADIENTS.blue}
-        title="Shop QR Code"
-        subtitle="Print this and stick it on the counter — customers scan to upload & pay."
-      />
+    <div className="mx-auto max-w-md space-y-4">
+      {/* print: only the poster, no sidebar or top bar */}
+      <style>{`@media print { header, aside, nav, footer, .no-print { display: none !important; } main { padding: 0 !important; } div.pt-16 { padding-top: 0 !important; } .poster { border: 0 !important; box-shadow: none !important; } }`}</style>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-2">
-          <Card className="h-full">
-            <div className="flex flex-col items-center p-6 text-center">
-              <div
-                className="rounded-2xl p-3"
-                style={{ background: "linear-gradient(135deg, #4F46E5 0%, #6366F1 50%, #A78BFA 100%)" }}
-              >
-                <div className="rounded-xl bg-white p-3">
-                  {qrUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- dynamically generated PNG from our own API, not a static asset
-                    <img src={qrUrl} alt="Shop QR code" className="h-60 w-60 rounded-lg sm:h-64 sm:w-64" />
-                  ) : (
-                    <div className="h-60 w-60 animate-pulse rounded-lg bg-slate-100 sm:h-64 sm:w-64" />
-                  )}
-                </div>
-              </div>
+      <Card className="poster">
+        <div className="flex flex-col items-center px-6 py-8 text-center">
+          <h2 className="text-xl font-extrabold tracking-tight text-slate-900/90">{shop?.name || "Scan to print"}</h2>
+          <p className="mt-1 text-sm text-slate-900/60">Scan, upload your file, pay and collect.</p>
 
-              <div className="mt-5 flex w-full items-center gap-2 rounded-lg bg-slate-900/[0.04] px-3 py-2 text-left">
-                <span className="min-w-0 grow truncate text-[13px] text-slate-900/70">{appUrl}/</span>
-                <button onClick={copyLink} className="shrink-0 text-[13px] font-semibold text-[#4F46E5] hover:underline">
-                  {copied ? "Copied ✓" : "Copy"}
-                </button>
-              </div>
+          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element -- generated PNG from our own API */}
+            <img src={qrUrl} alt="Shop QR code" className="h-64 w-64" />
+          </div>
 
-              <a
-                href={qrUrl ?? "#"}
-                download="shop-qr.png"
-                className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#4F46E5] px-5 py-2 text-sm font-medium text-white shadow-[0_2px_6px_rgba(79,70,229,0.4)] transition hover:brightness-95"
-              >
-                ⬇ Download PNG
-              </a>
-            </div>
-          </Card>
+          <div className="mt-5 break-all text-sm font-semibold text-slate-900/80">{shop ? shop.url.replace(/^https?:\/\//, "") : " "}</div>
         </div>
+      </Card>
 
-        <div className="space-y-6 lg:col-span-3">
-          <Card>
-            <CardHeader icon={<FluentIcon name="clipboard" size={30} />} title="How it works" subtitle="Three steps to start taking orders" />
-            <div className="space-y-4 px-6 pb-6">
-              {STEPS.map((s, i) => (
-                <div key={s.title} className="flex items-start gap-4">
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg"
-                    style={{ background: "rgba(79,70,229,0.12)" }}
-                  >
-                    {s.icon}
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900/90">
-                      Step {i + 1} · {s.title}
-                    </div>
-                    <div className="mt-0.5 text-sm text-slate-900/60">{s.text}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Alert tone="primary" icon="💡">
-            Tip: Print this at a large size (A5 or bigger) and laminate it for the counter — customers scan it with their
-            phone camera to open the upload page directly.
-          </Alert>
+      <div className="no-print space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outlined" onClick={copyLink} disabled={!shop}>
+            {copied ? "Link copied" : "Copy link"}
+          </Button>
+          <Button variant="outlined" onClick={() => window.print()}>
+            Print
+          </Button>
         </div>
+        <a
+          href={qrUrl}
+          download="shop-qr.png"
+          className="flex w-full items-center justify-center rounded-lg bg-[color:var(--accent)] px-5 py-2.5 text-sm font-medium text-white transition active:brightness-95"
+        >
+          Download QR image
+        </a>
+
+        {shop && !shop.slug && (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[13px] text-amber-800">
+            This link uses your fixed shop code, so it never changes. Want a short readable one? Pick it in{" "}
+            <Link href="/admin/settings" className="font-semibold underline">
+              Settings
+            </Link>
+            . QR codes you printed earlier keep working.
+          </p>
+        )}
+        <p className="text-center text-xs text-slate-900/50">Print it at A5 or bigger and stick it where customers can see it.</p>
       </div>
     </div>
   );

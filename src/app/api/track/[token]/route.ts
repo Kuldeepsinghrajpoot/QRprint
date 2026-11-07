@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
+import { PricingConfig } from "@/models/PricingConfig";
+import { estimateWait } from "@/lib/queueEstimate";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
@@ -22,9 +24,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   await connectDB();
 
   const order = await Order.findOne({ token: token.toUpperCase().replace(/^#/, "") }).select(
-    "token customerName printStatus paymentStatus paymentMethod totalPrice pages copies printType createdAt"
+    "shopId token customerName printStatus paymentStatus paymentMethod totalPrice pages copies printType createdAt cancelledBy cancelReason"
   );
 
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
-  return NextResponse.json(order);
+
+  // While the order is still waiting: how many orders are ahead of it and about how long that takes.
+  const { shopId, ...publicOrder } = order.toObject();
+  let wait: { ahead: number; waitMinutes: number } | undefined;
+  if (order.paymentStatus === "paid" && ["queued", "printing"].includes(order.printStatus)) {
+    const config = await PricingConfig.findOne({ shopId }).select("showWaitTime").lean();
+    if (config?.showWaitTime !== false) {
+      const w = await estimateWait(shopId, order.createdAt);
+      wait = { ahead: w.ahead, waitMinutes: w.minutes };
+    }
+  }
+  return NextResponse.json({ ...publicOrder, ...wait });
 }

@@ -1,18 +1,23 @@
 export type PrintType = "bw" | "color";
 export type PaperSize = "A4" | "A3" | "Legal" | "Letter" | "Photo";
 export type BindingType = "none" | "spiral" | "lamination";
-export type PaymentMethod = "cash" | "online";
+export type PaymentMethod = "cash" | "online" | "free";
 export type PaymentStatus = "pending" | "paid" | "refunded";
 export type PrintStatus = "queued" | "printing" | "ready" | "collected" | "failed" | "cancelled";
 
 export interface OrderDTO {
   _id: string;
   token: string;
+  cancelledBy?: "customer" | "shop";
+  cancelReason?: string;
+  cancelKey?: string; // only in the response to placing the order; needed to cancel it
   customerName: string;
   customerPhone?: string;
   fileUrl?: string;
   fileName?: string;
   requiresManualPrint: boolean;
+  updatedAt?: string;
+  approvedForPrint?: boolean; // staff pressed "Print now" (only matters while auto-print is off)
 
   printType: PrintType;
   paperSize: PaperSize;
@@ -58,9 +63,26 @@ export interface PricingConfigDTO {
   priorityFeePercent: number;
   gstEnabled: boolean;
   gstPercent: number;
+  freePrinting?: boolean;
   cashPaymentEnabled: boolean;
   onlinePaymentEnabled: boolean;
   printingPaused: boolean;
+  // Shop Controls
+  autoPrint?: boolean;
+  defaultColorPrinterId?: string;
+  defaultBwPrinterId?: string;
+  openingHoursEnabled?: boolean;
+  openTime?: string;
+  closeTime?: string;
+  openDays?: number[];
+  timezone?: string;
+  minOrderAmount?: number;
+  maxPagesPerOrder?: number;
+  maxActiveOrders?: number;
+  showWaitTime?: boolean;
+  requirePhone?: boolean;
+  customerNotice?: string;
+  cashAutoCancelMinutes?: number;
 }
 
 /** One computer a printer is installed on, and how it is connected there. */
@@ -94,6 +116,7 @@ export interface AgentDTO {
     printerId: string;
     name: string;
     port?: string;
+    portType?: string;
     ipAddress?: string;
     tcpPort?: number;
     status: PrinterHostDTO["status"];

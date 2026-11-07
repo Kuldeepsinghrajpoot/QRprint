@@ -15,6 +15,8 @@ const TYPES: Record<string, string> = {
   ".zip": "application/zip",
 };
 
+const INLINE = new Set([".pdf", ".png", ".jpg", ".jpeg"]);
+
 /** GET /api/files/orders/<file> — serves files saved on the local disk (the default storage). */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ key: string[] }> }) {
   const { key } = await params;
@@ -26,9 +28,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ key
 
   try {
     const data = await fs.readFile(full);
+    const ext = path.extname(full).toLowerCase();
     return new NextResponse(new Uint8Array(data), {
       headers: {
-        "Content-Type": TYPES[path.extname(full).toLowerCase()] || "application/octet-stream",
+        "Content-Type": TYPES[ext] || "application/octet-stream",
+        // PDFs and images open in the browser; Word/ZIP files are downloaded, never rendered.
+        "Content-Disposition": `${INLINE.has(ext) ? "inline" : "attachment"}; filename="${path.basename(full).replace(/"/g, "")}"`,
+        "X-Content-Type-Options": "nosniff",
+        "X-Robots-Tag": "noindex",
+        "Referrer-Policy": "no-referrer",
         "Cache-Control": "private, no-store",
       },
     });

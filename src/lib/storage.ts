@@ -148,6 +148,39 @@ export function publicUrlForKey(key: string): string {
   return isSupabaseConfigured() ? supabasePublicUrl(key) : localUrl(key);
 }
 
+/** Upload keys look like orders/<13-digit ms timestamp>-<random>-<name>; only files with that shape are ever cleaned up. */
+const OUR_FILE = /^\d{13}-/;
+
+/** Lists the files currently in storage (name + upload time), for removing uploads that never became an order. */
+export async function listStoredFiles(): Promise<{ key: string; createdAt: number }[]> {
+  const timeOf = (name: string, fallback: number) => (OUR_FILE.test(name) ? Number(name.slice(0, 13)) : fallback);
+  if (isSupabaseConfigured()) {
+    const res = await fetch(`${sbBase()}/storage/v1/object/list/${sbBucket()}`, {
+      method: "POST",
+      headers: { ...sbAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix: "orders", limit: 1000, offset: 0, sortBy: { column: "created_at", order: "asc" } }),
+    });
+    if (!res.ok) throw new Error(`Supabase list failed: ${await supabaseErrorMessage(res)}`);
+    const rows = (await res.json()) as { name?: string; created_at?: string }[];
+    return rows
+      .filter((r) => r.name && OUR_FILE.test(r.name))
+      .map((r) => ({ key: `orders/${r.name}`, createdAt: timeOf(r.name!, Date.parse(r.created_at ?? "") || Date.now()) }));
+  }
+  const dir = path.join(LOCAL_UPLOAD_DIR, "orders");
+  let names: string[] = [];
+  try {
+    names = await fs.readdir(dir);
+  } catch {
+    return [];
+  }
+  const out: { key: string; createdAt: number }[] = [];
+  for (const name of names.filter((n) => OUR_FILE.test(n))) {
+    const stat = await fs.stat(path.join(dir, name)).catch(() => null);
+    out.push({ key: `orders/${name}`, createdAt: timeOf(name, stat?.mtimeMs ?? Date.now()) });
+  }
+  return out;
+}
+
 /** Deletes a stored file — used for the "auto-delete after collection" privacy feature. */
 export async function deleteFile(key: string): Promise<void> {
   if (isSupabaseConfigured()) {

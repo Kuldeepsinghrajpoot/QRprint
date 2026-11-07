@@ -3,9 +3,67 @@
 :root {
   --background: #f4f6fb;
   --foreground: #1e293b;
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
+  --primary: var(--accent);
+  --primary-dark: var(--accent-dark);
   --success: #16a34a;
+}
+
+/* ---------- Colour palettes (switch with <html data-palette="...">; default = ocean) ---------- */
+:root {
+  --accent: #0077B6;
+  --accent-dark: #005F8F;
+  --accent-light: #00A6D6;
+  --accent-rgb: 0 119 182;
+  --accent-light-rgb: 0 166 214;
+}
+:root[data-palette="navy"] {
+  --accent: #1E3A8A;
+  --accent-dark: #172554;
+  --accent-light: #3B82F6;
+  --accent-rgb: 30 58 138;
+  --accent-light-rgb: 59 130 246;
+}
+:root[data-palette="green"] {
+  --accent: #059669;
+  --accent-dark: #047857;
+  --accent-light: #10B981;
+  --accent-rgb: 5 150 105;
+  --accent-light-rgb: 16 185 129;
+}
+:root[data-palette="orange"] {
+  --accent: #EA580C;
+  --accent-dark: #C2410C;
+  --accent-light: #FB923C;
+  --accent-rgb: 234 88 12;
+  --accent-light-rgb: 251 146 60;
+}
+:root[data-palette="purple"] {
+  --accent: #7C3AED;
+  --accent-dark: #5B21B6;
+  --accent-light: #A78BFA;
+  --accent-rgb: 124 58 237;
+  --accent-light-rgb: 167 139 250;
+}
+:root[data-palette="rose"] {
+  --accent: #E11D48;
+  --accent-dark: #BE123C;
+  --accent-light: #FB7185;
+  --accent-rgb: 225 29 72;
+  --accent-light-rgb: 251 113 133;
+}
+:root[data-palette="teal"] {
+  --accent: #0D9488;
+  --accent-dark: #0F766E;
+  --accent-light: #2DD4BF;
+  --accent-rgb: 13 148 136;
+  --accent-light-rgb: 45 212 191;
+}
+:root[data-palette="graphite"] {
+  --accent: #334155;
+  --accent-dark: #1E293B;
+  --accent-light: #64748B;
+  --accent-rgb: 51 65 85;
+  --accent-light-rgb: 100 116 139;
 }
 
 @theme inline {
@@ -14,7 +72,7 @@
 }
 
 body {
-  background: linear-gradient(135deg, #eef2ff 0%, #f4f6fb 100%);
+  background: linear-gradient(160deg, #f1f5f9 0%, #f8fafc 100%);
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, Helvetica, sans-serif;
   min-height: 100vh;
@@ -94,22 +152,23 @@ body {
 /* ---------- Reusable component classes ---------- */
 .input {
   width: 100%;
-  padding: 0.7rem 0.85rem;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 0.6rem;
-  font-size: 0.875rem;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
   outline: none;
   transition: border-color 0.15s;
   background: white;
 }
 .input:focus {
   border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.15);
 }
 
 .btn-primary {
   width: 100%;
   padding: 0.85rem;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   background: var(--primary);
   color: white;
   font-size: 0.9rem;
@@ -128,7 +187,7 @@ body {
 .btn-secondary {
   width: 100%;
   padding: 0.75rem;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   background: transparent;
   border: 1.5px solid #e2e8f0;
   color: var(--foreground);
@@ -159,4 +218,34 @@ body {
   font-weight: 700;
   background: #fef9c3;
   color: #a16207;
+}
+
+/* ---------- Landing page (Chhapo) ---------- */
+@theme {
+  --color-ink: #231710;
+  --color-paper: #fff8f2;
+  --color-brand: #ea580c;
+  --color-brand-dark: #9a3412;
+  --color-mist: #ffe6d3;
+  --color-sun: #fbbf24;
+  --font-display: var(--font-public-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-landing: var(--font-public-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+@keyframes feed {
+  from { transform: translateY(-70%); }
+  to { transform: translateY(0); }
+}
+.paper-feed { animation: feed 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) 0.4s both; }
+@media (prefers-reduced-motion: reduce) { .paper-feed { animation: none; } }
+
+.landing details > summary { list-style: none; cursor: pointer; }
+.landing details > summary::-webkit-details-marker { display: none; }
+.landing details[open] .faq-plus { transform: rotate(45deg); }
+.landing a:focus-visible,
+.landing button:focus-visible,
+.landing summary:focus-visible {
+  outline: 3px solid var(--color-sun);
+  outline-offset: 3px;
+  border-radius: 6px;
 }

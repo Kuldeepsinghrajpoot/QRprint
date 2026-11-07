@@ -1,9 +1,10 @@
+import { serverError } from "@/lib/apiError";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
 import { Printer } from "@/models/Printer";
 import { Agent } from "@/models/Agent";
-import { verifyAgentKey } from "@/lib/agentAuth";
+import { getAgentShopId } from "@/lib/agentAuth";
 import { aggregateStatus, HOST_STALE_MS } from "@/lib/printerHosts";
 
 export const runtime = "nodejs";
@@ -49,7 +50,8 @@ const schema = z.object({
  * Responds with the dashboard printers so the agent can map IDs automatically.
  */
 export async function POST(req: NextRequest) {
-  if (!verifyAgentKey(req)) {
+  const shopId = await getAgentShopId(req);
+  if (!shopId) {
     return NextResponse.json({ error: "Invalid or missing agent key" }, { status: 401 });
   }
 
@@ -69,12 +71,12 @@ export async function POST(req: NextRequest) {
       await Printer.bulkWrite(
         names.map((name) => ({
           updateOne: {
-            filter: { shopId: "main", systemPrinterName: name },
+            filter: { shopId, systemPrinterName: name },
             update: {
               // With agent info the status is computed from the computers below; legacy agents set it directly.
               $set: agent ? { lastSeenAt: now } : { status: "online", lastSeenAt: now },
               $setOnInsert: {
-                shopId: "main",
+                shopId,
                 name,
                 systemPrinterName: name,
                 type: "both",
@@ -91,7 +93,7 @@ export async function POST(req: NextRequest) {
 
     if (agent) {
       await Agent.updateOne(
-        { shopId: "main", agentId: agent.id },
+        { shopId, agentId: agent.id },
         {
           $set: {
             hostname: agent.hostname,
@@ -102,13 +104,13 @@ export async function POST(req: NextRequest) {
             appVersion: agent.appVersion,
             lastSeenAt: now,
           },
-          $setOnInsert: { shopId: "main", agentId: agent.id },
+          $setOnInsert: { shopId, agentId: agent.id },
         },
         { upsert: true }
       );
 
       // Refresh this computer's entry on every printer it reported.
-      const docs = await Printer.find({ shopId: "main", systemPrinterName: { $in: names } });
+      const docs = await Printer.find({ shopId, systemPrinterName: { $in: names } });
       for (const doc of docs) {
         const p = reported.get(doc.systemPrinterName)!;
         const existing = doc.hosts.find((h) => h.agentId === agent.id);
@@ -135,7 +137,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Printers this computer no longer has: drop its entry and recompute.
-      const gone = await Printer.find({ shopId: "main", systemPrinterName: { $nin: names }, "hosts.agentId": agent.id });
+      const gone = await Printer.find({ shopId, systemPrinterName: { $nin: names }, "hosts.agentId": agent.id });
       for (const doc of gone) {
         doc.hosts = doc.hosts.filter((h) => h.agentId !== agent.id);
         doc.status = aggregateStatus(doc.hosts, now).status;
@@ -144,15 +146,15 @@ export async function POST(req: NextRequest) {
 
       // Forget computers that haven't reported for a week (retired PCs).
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      await Printer.updateMany({ shopId: "main", "hosts.lastSeenAt": { $lt: weekAgo } }, { $pull: { hosts: { lastSeenAt: { $lt: weekAgo } } } });
-      await Agent.deleteMany({ shopId: "main", lastSeenAt: { $lt: weekAgo } });
+      await Printer.updateMany({ shopId, "hosts.lastSeenAt": { $lt: weekAgo } }, { $pull: { hosts: { lastSeenAt: { $lt: weekAgo } } } });
+      await Agent.deleteMany({ shopId, lastSeenAt: { $lt: weekAgo } });
     }
 
     // A printer missing from THIS agent's list is only marked offline if nobody has reported it recently.
     const staleBefore = new Date(now.getTime() - HOST_STALE_MS);
     await Printer.updateMany(
       {
-        shopId: "main",
+        shopId,
         systemPrinterName: { $nin: names },
         status: { $ne: "offline" },
         $or: [{ lastSeenAt: { $lt: staleBefore } }, { lastSeenAt: { $exists: false } }],
@@ -160,12 +162,11 @@ export async function POST(req: NextRequest) {
       { $set: { status: "offline" } }
     );
 
-    const printers = await Printer.find({ shopId: "main" }).select("systemPrinterName type").lean();
+    const printers = await Printer.find({ shopId }).select("systemPrinterName type").lean();
     return NextResponse.json(
       printers.map((p) => ({ id: String(p._id), systemPrinterName: p.systemPrinterName, type: p.type }))
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to sync printers";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, "Failed to sync printers");
   }
 }

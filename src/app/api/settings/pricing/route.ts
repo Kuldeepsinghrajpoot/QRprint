@@ -1,8 +1,10 @@
+import { serverError } from "@/lib/apiError";
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { PricingConfig, DEFAULT_RATES } from "@/models/PricingConfig";
 import { getSession } from "@/lib/session";
 import { z } from "zod";
+import { resolveShopId } from "@/lib/shop";
 
 const tier = z.object({
   page1: z.number().min(0).max(100000),
@@ -24,6 +26,7 @@ const pricingSchema = z
     priorityFeePercent: z.number().min(0).max(1000),
     gstEnabled: z.boolean(),
     gstPercent: z.number().min(0).max(100),
+    freePrinting: z.boolean(),
     cashPaymentEnabled: z.boolean(),
     onlinePaymentEnabled: z.boolean(),
     printingPaused: z.boolean(),
@@ -33,12 +36,19 @@ const pricingSchema = z
 export const runtime = "nodejs";
 
 /** GET /api/settings/pricing — public (customer page needs this to calculate live prices) */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // The customer page passes ?shop=<id> from the QR link; the dashboard (logged in) always gets its own shop.
+  const session = await getSession();
   await connectDB();
-  let config = await PricingConfig.findOne({ shopId: "main" });
+  const asked = req.nextUrl.searchParams.get("shop");
+  const shopId = asked ? await resolveShopId(asked) : session?.shopId || "main";
+  if (!shopId) {
+    return NextResponse.json({ error: "Shop not found" }, { status: 404 });
+  }
+  let config = await PricingConfig.findOne({ shopId });
 
   if (!config) {
-    config = await PricingConfig.create({ shopId: "main", shopName: "My Print Shop", rates: DEFAULT_RATES });
+    config = await PricingConfig.create({ shopId, shopName: "My Print Shop", rates: DEFAULT_RATES });
   }
 
   return NextResponse.json(config);
@@ -58,13 +68,14 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
     await connectDB();
-    const config = await PricingConfig.findOneAndUpdate({ shopId: "main" }, { $set: parsed.data }, {
+    // Free printing and paid methods are exclusive: when free printing is on, Cash and Online are forced off.
+    const update = parsed.data.freePrinting ? { ...parsed.data, cashPaymentEnabled: false, onlinePaymentEnabled: false } : parsed.data;
+    const config = await PricingConfig.findOneAndUpdate({ shopId: session.shopId }, { $set: update }, {
       new: true,
       upsert: true,
     });
     return NextResponse.json(config);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to update pricing";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, "Failed to update pricing");
   }
 }

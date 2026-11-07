@@ -2,32 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import FluentIcon, { type FluentIconName } from "@/components/lexical/FluentIcon";
+import LineIcon, { type LineIconName } from "@/components/lexical/LineIcon";
 
 export interface NavItem {
   href: string;
   label: string;
-  icon: FluentIconName;
+  icon: LineIconName;
   ownerOnly?: boolean;
 }
 
 export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "Insights",
-    items: [{ href: "/admin/analytics", label: "Analytics", icon: "bar-chart" }],
+    items: [
+      { href: "/admin/analytics", label: "Analytics", icon: "bar" },
+      { href: "/admin/report", label: "Daily Report", icon: "files", ownerOnly: true },
+    ],
   },
   {
     title: "Shop",
     items: [
-      { href: "/admin", label: "Live Queue", icon: "clipboard" },
+      { href: "/admin", label: "Live Queue", icon: "list" },
+      { href: "/admin/orders", label: "Order History", icon: "history" },
+      { href: "/admin/customers", label: "Customers", icon: "users", ownerOnly: true },
       { href: "/admin/printers", label: "Printers", icon: "printer" },
+      { href: "/admin/supplies", label: "Supplies", icon: "droplet" },
     ],
   },
   {
     title: "Manage",
     items: [
-      { href: "/admin/settings", label: "Pricing & Settings", icon: "gear", ownerOnly: true },
-      { href: "/admin/qr", label: "Shop QR Code", icon: "link" },
+      { href: "/admin/pricing", label: "Pricing", icon: "wallet", ownerOnly: true },
+      { href: "/admin/settings", label: "Settings", icon: "gear", ownerOnly: true },
+      { href: "/admin/controls", label: "Shop Controls", icon: "sliders", ownerOnly: true },
+      { href: "/admin/qr", label: "Shop QR Code", icon: "qr" },
     ],
   },
 ];
@@ -49,17 +57,17 @@ export default function AdminNav({
       {open && <div className="fixed inset-0 z-40 bg-slate-900/50 lg:hidden" onClick={onClose} />}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col bg-white shadow-[0_0_20px_rgba(51,48,60,0.06)] transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-[1px_0_0_rgba(15,23,42,0.08)] ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r border-slate-200 bg-white transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-[1px_0_0_rgba(15,23,42,0.08)] ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Brand */}
-        <Link href="/admin" onClick={onClose} className="flex items-center gap-3 px-6 pb-5 pt-6">
+        <Link href="/admin" onClick={onClose} className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-900/10 px-6">
           <span
             className="flex h-10 w-10 items-center justify-center rounded-[10px]"
-            style={{ background: "linear-gradient(135deg, #312E81 0%, #4F46E5 60%, #6366F1 100%)", boxShadow: "0 4px 10px rgba(79,70,229,0.4)" }}
+            style={{ background: "linear-gradient(135deg, var(--accent-dark) 0%, var(--accent) 60%, var(--accent-light) 100%)", boxShadow: "0 4px 10px rgb(var(--accent-rgb) / 0.4)" }}
           >
-            <FluentIcon name="printer" size={26} />
+            <LineIcon name="printer" size={24} className="text-white" />
           </span>
           <span>
             <span className="block text-[1.25rem] font-extrabold leading-tight tracking-tight text-slate-900/90">QRtoPrint</span>
@@ -67,7 +75,7 @@ export default function AdminNav({
           </span>
         </Link>
 
-        <nav className="flex-1 overflow-y-auto px-4 pb-6">
+        <nav className="flex-1 overflow-y-auto px-4 pb-6 pt-4">
           {NAV_SECTIONS.map((section) => {
             const items = section.items.filter((i) => !i.ownerOnly || role === "owner");
             if (items.length === 0) return null;
@@ -85,21 +93,20 @@ export default function AdminNav({
                         <Link
                           href={item.href}
                           onClick={onClose}
-                          className={`flex items-center gap-3 rounded-lg px-3 py-[9px] text-[0.9375rem] transition ${
+                          className={`flex items-center gap-3 rounded-md px-3 py-[9px] text-[0.9375rem] transition ${
                             active
                               ? "font-medium text-white"
-                              : "text-slate-900/75 hover:bg-slate-900/[0.04]"
+                              : "text-slate-900/75 active:bg-slate-900/[0.04]"
                           }`}
                           style={
                             active
                               ? {
-                                  background: "linear-gradient(72.47deg, #4F46E5 22.16%, rgba(79,70,229,0.7) 76.47%)",
-                                  boxShadow: "0 2px 6px rgba(79,70,229,0.48)",
+                                  background: "var(--accent)",
                                 }
                               : undefined
                           }
                         >
-                          <FluentIcon name={item.icon} size={22} />
+                          <LineIcon name={item.icon} size={22} className={active ? "text-white" : "text-slate-600"} />
                           {item.label}
                         </Link>
                       </li>
@@ -111,13 +118,14 @@ export default function AdminNav({
           })}
         </nav>
 
-        <div className="m-4 rounded-[10px] p-4 text-xs" style={{ background: "rgba(79,70,229,0.08)", color: "#4338CA" }}>
-          <div className="mb-0.5 text-sm font-semibold">Need the customer page?</div>
-          Customers scan your Shop QR to upload &amp; pay.{" "}
-          <Link href="/admin/qr" onClick={onClose} className="font-semibold underline">
-            Get QR →
-          </Link>
-        </div>
+        {/* <Link
+          href="/admin/qr"
+          onClick={onClose}
+          className="m-4 flex items-center justify-between whitespace-nowrap rounded-md px-4 py-2.5 text-sm font-semibold"
+          style={{ background: "rgb(var(--accent-rgb) / 0.08)", color: "var(--accent)" }}
+        >
+          Get customer QR <span aria-hidden>→</span>
+        </Link> */}
       </aside>
     </>
   );

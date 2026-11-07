@@ -28,14 +28,14 @@ export async function PATCH(req: NextRequest) {
 
   await connectDB();
   let config = await PricingConfig.findOneAndUpdate(
-    { shopId: "main" },
+    { shopId: session.shopId },
     { printingPaused: parsed.data.printingPaused },
     { new: true }
   );
 
   if (!config) {
     config = await PricingConfig.create({
-      shopId: "main",
+      shopId: session.shopId,
       shopName: "My Print Shop",
       rates: DEFAULT_RATES,
       printingPaused: parsed.data.printingPaused,

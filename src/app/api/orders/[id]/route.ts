@@ -1,8 +1,10 @@
+import { serverError } from "@/lib/apiError";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
+import { Printer } from "@/models/Printer";
 import { purgeOrderFile } from "@/lib/fileCleanup";
 import { getSession } from "@/lib/session";
 import { sendOrderNotification, readyMessage } from "@/lib/notify";
@@ -11,8 +13,11 @@ export const runtime = "nodejs";
 
 const updateSchema = z.object({
   paymentStatus: z.enum(["pending", "paid", "refunded"]).optional(),
-  printStatus: z.enum(["queued", "printing", "ready", "collected", "failed", "cancelled"]).optional(),
+  // "cancelled" is not allowed here: use POST /api/orders/:id/shop-cancel (it also refunds and deletes the file)
+  printStatus: z.enum(["queued", "printing", "ready", "collected", "failed"]).optional(),
   printerId: z.string().optional(),
+  // "Print now" while the shop has auto-print switched off
+  approvedForPrint: z.boolean().optional(),
 });
 
 /** PATCH /api/orders/:id — dashboard actions: "Cash Received", "Mark Ready", "Collected", refund, assign printer */
@@ -34,9 +39,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
+    // Marking "refunded" only records it - the money is returned through the cancel flow or the payment gateway -
+    // so keep it to the owner.
+    if (parsed.data.paymentStatus === "refunded" && session.role !== "owner") {
+      return NextResponse.json({ error: "Only the shop owner can mark an order as refunded" }, { status: 403 });
+    }
+
     await connectDB();
-    const before = await Order.findById(id).select("printStatus").lean();
-    const order = await Order.findByIdAndUpdate(id, parsed.data, { new: true });
+    // Only orders of the signed-in shop can be changed.
+    const before = await Order.findOne({ _id: id, shopId: session.shopId }).select("printStatus").lean();
+    if (!before) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+    if (parsed.data.printerId) {
+      // ...and only to a printer of the same shop.
+      const mine = mongoose.isValidObjectId(parsed.data.printerId) && (await Printer.exists({ _id: parsed.data.printerId, shopId: session.shopId }));
+      if (!mine) return NextResponse.json({ error: "Printer not found" }, { status: 404 });
+    }
+    const order = await Order.findOneAndUpdate({ _id: id, shopId: session.shopId }, parsed.data, { new: true });
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
@@ -63,7 +83,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return NextResponse.json(fileDeleted === undefined ? order : { ...order.toObject(), fileDeleted });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to update order";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err, "Failed to update order");
   }
 }
