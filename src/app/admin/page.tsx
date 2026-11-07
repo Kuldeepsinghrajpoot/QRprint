@@ -552,6 +552,12 @@ function OrderCard({
   const needsPaperChange =
     order.paperSize !== "A4" && !order.printerId && order.printStatus === "queued" && order.paymentStatus !== "pending";
 
+  const compatiblePrinters = printers.filter(
+    (p) =>
+      (p.type === "both" || p.type === order.printType) &&
+      p.supportedPaperSizes.includes(order.paperSize)
+  );
+
   const awaitingOk =
     autoPrintOff && order.printStatus === "queued" && order.paymentStatus === "paid" && !order.approvedForPrint && !order.requiresManualPrint;
 
@@ -759,21 +765,26 @@ function OrderCard({
             Cancel print
           </Button>
         )}
-        {printers.length > 0 && order.printStatus === "queued" && (
-          <select
-            defaultValue=""
-            onChange={(e) => e.target.value && onUpdate(order._id, { printerId: e.target.value })}
-            aria-label="Assign printer"
-            className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900/80 outline-none transition focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)]"
-          >
-            <option value="">Assign printer…</option>
-            {printers.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.name} ({p.status}){computersLabel(p) ? ` — ${computersLabel(p)}` : ""}
-              </option>
-            ))}
-          </select>
-        )}
+        {printers.length > 0 && order.printStatus === "queued" &&
+          (compatiblePrinters.length > 0 ? (
+            <select
+              defaultValue=""
+              onChange={(e) => e.target.value && onUpdate(order._id, { printerId: e.target.value })}
+              aria-label="Assign printer"
+              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900/80 outline-none transition focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)]"
+            >
+              <option value="">Assign printer…</option>
+              {compatiblePrinters.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.name} ({p.status}){computersLabel(p) ? ` — ${computersLabel(p)}` : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xs text-slate-500">
+              No printer supports {order.printType === "color" ? "color" : "B&W"} on {order.paperSize}
+            </span>
+          ))}
         <span className="ml-auto flex items-center gap-4 text-[13px] font-medium text-[color:var(--accent)]">
           {order.fileUrl && ["queued", "printing", "ready"].includes(order.printStatus) && (
             <a href={order.fileUrl} target="_blank" rel="noreferrer" className="active:underline">

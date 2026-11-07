@@ -47,14 +47,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     await connectDB();
     // Only orders of the signed-in shop can be changed.
-    const before = await Order.findOne({ _id: id, shopId: session.shopId }).select("printStatus").lean();
+    const before = await Order.findOne({ _id: id, shopId: session.shopId }).select("printStatus printType paperSize").lean();
     if (!before) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
     if (parsed.data.printerId) {
       // ...and only to a printer of the same shop.
-      const mine = mongoose.isValidObjectId(parsed.data.printerId) && (await Printer.exists({ _id: parsed.data.printerId, shopId: session.shopId }));
-      if (!mine) return NextResponse.json({ error: "Printer not found" }, { status: 404 });
+      const printer = mongoose.isValidObjectId(parsed.data.printerId)
+        ? await Printer.findOne({ _id: parsed.data.printerId, shopId: session.shopId })
+            .select("type supportedPaperSizes")
+            .lean()
+        : null;
+      if (!printer) return NextResponse.json({ error: "Printer not found" }, { status: 404 });
+      const supportsType = printer.type === "both" || printer.type === before.printType;
+      const supportsPaper = printer.supportedPaperSizes.includes(before.paperSize);
+      if (!supportsType || !supportsPaper) {
+        return NextResponse.json(
+          { error: "The selected printer does not support this order's print type and paper size" },
+          { status: 400 }
+        );
+      }
     }
     const order = await Order.findOneAndUpdate({ _id: id, shopId: session.shopId }, parsed.data, { new: true });
     if (!order) {
