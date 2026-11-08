@@ -7,7 +7,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
  * Palette: theme accent (see globals.css) + Slate. Font: Public Sans.
  */
 
-export const LEX_FONT = "'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
+export const LEX_FONT = "var(--font-public-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
 
 // Every page banner uses the same blue as the landing page.
 const BLUE = "linear-gradient(120deg, var(--accent-dark) 0%, var(--accent) 55%, var(--accent-light) 100%)";

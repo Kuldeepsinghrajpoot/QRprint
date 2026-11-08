@@ -48,6 +48,7 @@ function beep() {
 
 export default function AdminQueuePage() {
   const [orders, setOrders] = useState<OrderDTO[]>([]);
+  const [now, setNow] = useState(0);
   const [printers, setPrinters] = useState<PrinterDTO[]>([]);
   const [config, setConfig] = useState<PricingConfigDTO | null>(null);
   const [filter, setFilter] = useState("");
@@ -70,7 +71,10 @@ export default function AdminQueuePage() {
       const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       const res = await fetch(`/api/orders?date=${today}&tz=${d.getTimezoneOffset()}`, { cache: "no-store" });
       const data: OrderDTO[] = await res.json();
-      if (Array.isArray(data)) setOrders(data);
+      if (Array.isArray(data)) {
+        setOrders(data);
+        setNow(Date.now());
+      }
 
       // New-order alert: anything we haven't seen before (the first load only records what is already there)
       if (Array.isArray(data)) {
@@ -495,7 +499,7 @@ export default function AdminQueuePage() {
             onDrop={() => handleDrop(index)}
             className={isReorderView ? "cursor-grab active:cursor-grabbing" : ""}
           >
-            <OrderCard order={o} printers={printers} onUpdate={updateOrder} onAnnounce={announce} onCancel={cancelOrder} draggableHint={isReorderView} autoPrintOff={autoPrintOff} />
+            <OrderCard order={o} printers={printers} now={now} onUpdate={updateOrder} onAnnounce={announce} onCancel={cancelOrder} draggableHint={isReorderView} autoPrintOff={autoPrintOff} />
           </div>
         ))}
       </div>
@@ -524,20 +528,24 @@ function orderWhere(order: OrderDTO, printers: PrinterDTO[]): string {
 
 /** "On hold" countdown: the customer can still cancel, so the order isn't sent to the printer yet. */
 function HoldChip({ createdAt }: { createdAt: string }) {
-  const [, tick] = useState(0);
-  const left = Math.ceil((new Date(createdAt).getTime() + CANCEL_WINDOW_MS - Date.now()) / 1000);
+  const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
-    if (left <= 0) return;
-    const t = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [left > 0]); // eslint-disable-line react-hooks/exhaustive-deps -- only (re)start while the hold is active
-  if (left <= 0) return null;
+    const timeout = setTimeout(() => setNow(Date.now()), 0);
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, []);
+  const left = now === null ? null : Math.ceil((new Date(createdAt).getTime() + CANCEL_WINDOW_MS - now) / 1000);
+  if (left === null || left <= 0) return null;
   return <Chip color="info">On hold, customer can still cancel · prints in {left}s</Chip>;
 }
 
 function OrderCard({
   order,
   printers,
+  now,
   onUpdate,
   onAnnounce,
   onCancel,
@@ -546,6 +554,7 @@ function OrderCard({
 }: {
   order: OrderDTO;
   printers: PrinterDTO[];
+  now: number;
   onUpdate: (
     id: string,
     patch: Partial<Pick<OrderDTO, "paymentStatus" | "printStatus" | "approvedForPrint">> & { printerId?: string; confirmPrinted?: boolean }
@@ -628,8 +637,8 @@ function OrderCard({
         {order.paymentStatus === "paid" && <Chip color="success">Paid</Chip>}
         {order.paymentStatus === "refunded" && <Chip color="warning">Refunded</Chip>}
         {awaitingOk && <Chip color="warning">Waiting for your OK, auto-print is off</Chip>}
-        {order.printStatus === "ready" && order.updatedAt && Date.now() - new Date(order.updatedAt).getTime() > 15 * 60000 && (
-          <Chip color="warning">Not collected for {Math.round((Date.now() - new Date(order.updatedAt).getTime()) / 60000)} min</Chip>
+        {order.printStatus === "ready" && order.updatedAt && now > 0 && now - new Date(order.updatedAt).getTime() > 15 * 60000 && (
+          <Chip color="warning">Not collected for {Math.round((now - new Date(order.updatedAt).getTime()) / 60000)} min</Chip>
         )}
         {!awaitingOk && order.printStatus === "queued" && order.paymentStatus !== "pending" && <HoldChip createdAt={order.createdAt} />}
         {order.printStatus === "printing" && <Chip color="info">Printing…</Chip>}
