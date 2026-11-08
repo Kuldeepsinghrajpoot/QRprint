@@ -284,6 +284,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (!order) throw new Error("Order creation did not return an order");
+
     // Loyalty tracking (only if phone provided)
     if (data.customerPhone) {
       await Customer.findOneAndUpdate(

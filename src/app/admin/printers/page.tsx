@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import type { PrinterDTO, PrinterHostDTO, AgentDTO, PaperSize } from "@/types/order";
 import LineIcon from "@/components/lexical/LineIcon";
-import { Card, CardHeader, Chip, Dialog, Field, SelectField, StatCard, TextField, Button } from "@/components/lexical/ui";
+import { Card, CardHeader, Chip, Dialog, Field, SelectField, StatCard, TextField, Button, type ChipColor } from "@/components/lexical/ui";
 
 const ALL_PAPER_SIZES: PaperSize[] = ["A4", "A3", "Legal", "Letter", "Photo"];
 

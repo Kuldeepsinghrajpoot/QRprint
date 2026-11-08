@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import type { OrderDTO, PrinterDTO, PricingConfigDTO } from "@/types/order";
 import LineIcon from "@/components/lexical/LineIcon";
 import { CANCEL_WINDOW_MS } from "@/lib/orderTiming";
-import { Alert, Avatar, Button, Card, Chip, StatCard, Switch } from "@/components/lexical/ui";
+import { Alert, Avatar, Button, Card, Chip, StatCard, Switch, type Tone } from "@/components/lexical/ui";
 
 const POLL_INTERVAL_MS = 3000;
 
