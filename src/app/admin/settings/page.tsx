@@ -173,6 +173,9 @@ export default function SettingsPage() {
                   : `An agent key is active (ends in …${keyHint}). For safety it can't be shown again — create a new one if you lost it.`}
               </p>
             )}
+            <p className="text-sm text-slate-900/60">
+              Need the app? <a href="/print-agent" target="_blank" rel="noopener noreferrer" className="font-medium text-[color:var(--accent)] underline">Install guide and download</a>
+            </p>
             <Button variant="light" onClick={createAgentKey} disabled={keyBusy}>
               {keyBusy ? "Creating…" : keyHint === null ? "🔑 Create agent key" : "🔄 Create new key"}
             </Button>

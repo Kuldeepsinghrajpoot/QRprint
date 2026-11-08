@@ -283,8 +283,7 @@ export async function POST(req: NextRequest) {
         token = generateToken(); // collided with an order created moments ago — try a new one
       }
     }
-
-    if (!order) throw new Error("Order creation did not return an order");
+    if (!order) throw new Error("Could not create the order");
 
     // Loyalty tracking (only if phone provided)
     if (data.customerPhone) {

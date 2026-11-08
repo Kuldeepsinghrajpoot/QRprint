@@ -1,6 +1,7 @@
 // Change the brand once here and it updates everywhere.
 export const SITE = {
-  name: "Chhapo",
+  name: "QRtoPrint",
+  url: "https://www.qr.lexicalsoftware.in",
   tagline: "Scan. Upload. Print.",
   description:
     "QR printing software for cyber cafes, xerox shops and CSC centers. Customers scan, upload from their phone, pay by UPI and the print comes out automatically.",

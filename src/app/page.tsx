@@ -24,6 +24,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   return {
     title,
     description: SITE.description,
+    alternates: { canonical: "/" },
     openGraph: { title, description: SITE.description, type: "website", siteName: SITE.name },
   };
 }

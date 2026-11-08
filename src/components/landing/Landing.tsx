@@ -289,6 +289,7 @@ export default function Landing() {
         </div>
         <div className="border-t border-ink/10 py-5 text-center text-sm text-ink/60">
           <nav className="mb-2 flex flex-wrap justify-center gap-x-5 gap-y-1 font-medium">
+            <a href="/print-agent" className="hover:text-brand">Print Agent</a>
             <a href="/terms" className="hover:text-brand">Terms</a>
             <a href="/privacy-policy" className="hover:text-brand">Privacy Policy</a>
             <a href="/login" className="hover:text-brand">Login</a>
