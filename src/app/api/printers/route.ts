@@ -6,6 +6,7 @@ import { Printer } from "@/models/Printer";
 import { Order } from "@/models/Order";
 import { getSession } from "@/lib/session";
 import { aggregateStatus, isFresh } from "@/lib/printerHosts";
+import { PRINTED_SIDES_EXPR } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 
@@ -46,7 +47,7 @@ export async function GET() {
         updatedAt: { $gte: startOfToday },
       },
     },
-    { $group: { _id: "$printerId", orders: { $sum: 1 }, pages: { $sum: { $multiply: ["$pages", "$copies"] } } } },
+    { $group: { _id: "$printerId", orders: { $sum: 1 }, pages: { $sum: PRINTED_SIDES_EXPR } } },
   ]);
   const byPrinter = new Map(stats.map((s) => [String(s._id), s]));
 

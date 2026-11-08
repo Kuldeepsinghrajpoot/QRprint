@@ -3,12 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
 import { User } from "@/models/User";
-import { Shop } from "@/models/Shop";
-import { PricingConfig, DEFAULT_RATES } from "@/models/PricingConfig";
-import { hashPassword, createSessionToken, SESSION_COOKIE } from "@/lib/auth";
+import { SignupOtp } from "@/models/SignupOtp";
+import { hashPassword } from "@/lib/auth";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
-import { newShopId, rotateAgentKey, slugProblem, customerUrl } from "@/lib/shop";
+import { slugProblem } from "@/lib/shop";
 import { slugify } from "@/lib/shopUrl";
+import { sendMail, otpEmail } from "@/lib/mail";
+import { generateOtp, hashOtp, OTP_TTL_MS, OTP_RESEND_MS } from "@/lib/otp";
 
 export const runtime = "nodejs";
 
@@ -22,11 +23,12 @@ const signupSchema = z.object({
 });
 
 /**
- * POST /api/auth/signup — creates a NEW shop account (its own shopId, owner login, pricing and Print Agent key).
- * Each shop's data is completely separate from every other shop's.
+ * POST /api/auth/signup — step 1 of 2. Checks the details and emails a 6-digit code. No account exists yet:
+ * it is created by POST /api/auth/signup/verify once the owner proves they can read that inbox.
+ * Calling this again with the same details sends a fresh code (at most one per minute).
  */
 export async function POST(req: NextRequest) {
-  const { ok } = rateLimit(`signup:${getClientIp(req)}`, 5, 60 * 60 * 1000);
+  const { ok } = rateLimit(`signup:${getClientIp(req)}`, 10, 60 * 60 * 1000);
   if (!ok) return NextResponse.json({ error: "Too many sign-ups from this network. Try again later." }, { status: 429 });
 
   try {
@@ -42,30 +44,47 @@ export async function POST(req: NextRequest) {
     if (await User.exists({ email })) {
       return NextResponse.json({ error: "An account with this email already exists. Please sign in." }, { status: 409 });
     }
-
     const slugErr = await slugProblem(slug);
     if (slugErr) return NextResponse.json({ error: `Shop address: ${slugErr}`, field: "slug" }, { status: 409 });
 
-    const shopId = newShopId();
-    const agentKey = await rotateAgentKey(shopId, shopName);
-    await Shop.updateOne({ shopId }, { $set: { slug } });
-    await PricingConfig.create({ shopId, shopName, rates: DEFAULT_RATES });
-    const user = await User.create({ shopId, name, email, passwordHash: await hashPassword(password), role: "owner" });
-
-    const token = await createSessionToken({ userId: String(user._id), shopId, role: "owner", name });
-    const res = NextResponse.json({ ok: true, shopId, agentKey, slug, shopUrl: customerUrl(shopId, slug) }, { status: 201 });
-    res.cookies.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
-    return res;
-  } catch (err) {
-    if (typeof err === "object" && err !== null && "code" in err && (err as { code?: number }).code === 11000) {
-      return NextResponse.json({ error: "An account with this email already exists. Please sign in." }, { status: 409 });
+    const pending = await SignupOtp.findOne({ email });
+    if (pending && pending.resendAt.getTime() > Date.now()) {
+      const wait = Math.ceil((pending.resendAt.getTime() - Date.now()) / 1000);
+      return NextResponse.json({ error: `Please wait ${wait} seconds before asking for another code.`, retryAfter: wait }, { status: 429 });
     }
+
+    const code = generateOtp();
+    const now = Date.now();
+    await SignupOtp.findOneAndUpdate(
+      { email },
+      {
+        email,
+        codeHash: hashOtp(email, code),
+        attempts: 0,
+        resendAt: new Date(now + OTP_RESEND_MS),
+        expiresAt: new Date(now + OTP_TTL_MS),
+        name,
+        shopName,
+        slug,
+        passwordHash: await hashPassword(password),
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const mail = otpEmail({ name, code, minutes: OTP_TTL_MS / 60000 });
+    const sent = await sendMail({ to: email, ...mail });
+    if (!sent) {
+      if (process.env.NODE_ENV !== "production") {
+        // Local development with no mail provider: the code is printed here so you can still finish sign-up.
+        console.log(`[otp] (dev only) verification code for ${email}: ${code}`);
+      } else {
+        await SignupOtp.deleteOne({ email });
+        return NextResponse.json({ error: "We couldn't send the verification email. Please try again in a moment." }, { status: 502 });
+      }
+    }
+
+    return NextResponse.json({ ok: true, needsVerification: true, email, resendIn: OTP_RESEND_MS / 1000 });
+  } catch (err) {
     return serverError(err, "Sign-up failed");
   }
 }

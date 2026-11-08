@@ -7,6 +7,7 @@ import FluentIcon from "@/components/lexical/FluentIcon";
 import { Alert, Button, LEX_FONT, TextField, PAGE_BG } from "@/components/lexical/ui";
 import AgentKeyBox from "@/components/AgentKeyBox";
 import { shopUrlForSlug, slugify, validateSlug } from "@/lib/shopUrl";
+import PoweredBy from "@/components/PoweredBy";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -17,38 +18,57 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [agentKey, setAgentKey] = useState<string | null>(null);
+  // Step 2: the 6-digit code emailed to the owner
+  const [step, setStep] = useState<"form" | "code">("form");
+  const [code, setCode] = useState("");
+  const [cooldown, setCooldown] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
   const [shopUrl, setShopUrl] = useState("");
   // Shop address (sub-address name): follows the shop name until the user edits it.
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
-  const [slugAvailability, setSlugAvailability] = useState<{ ok: boolean; text: string } | null>(null);
+  const [slugNote, setSlugNote] = useState<{ ok: boolean; text: string } | null>(null);
   const addressesOn = !!shopUrlForSlug("x");
-  const slugIssue = addressesOn && slug ? validateSlug(slug) : null;
-  const slugNote = slugIssue ? { ok: false, text: slugIssue } : slugAvailability;
 
   useEffect(() => {
-    if (!addressesOn || !slug || slugIssue) return;
-    let active = true;
+    if (!slugTouched) setSlug(slugify(shopName));
+  }, [shopName, slugTouched]);
+
+  useEffect(() => {
+    if (!addressesOn || !slug) {
+      setSlugNote(null);
+      return;
+    }
+    const bad = validateSlug(slug);
+    if (bad) {
+      setSlugNote({ ok: false, text: bad });
+      return;
+    }
     const t = setTimeout(async () => {
       try {
         const r = await fetch(`/api/shop/slug-check?slug=${encodeURIComponent(slug)}`);
         const d = await r.json();
-        if (!active) return;
-        setSlugAvailability(d.available ? { ok: true, text: "Available ✓" } : { ok: false, text: d.reason || "Not available" });
+        setSlugNote(d.available ? { ok: true, text: "Available ✓" } : { ok: false, text: d.reason || "Not available" });
       } catch {
-        if (active) setSlugAvailability(null);
+        setSlugNote(null);
       }
     }, 400);
-    return () => {
-      active = false;
-      clearTimeout(t);
-    };
-  }, [addressesOn, slug, slugIssue]);
+    return () => clearTimeout(t);
+  }, [slug, addressesOn]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // counts down the "Resend code" wait
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  // Step 1 (and "Resend code"): check the details and email a code. No account exists until the code is verified.
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
     setLoading(true);
     setError(null);
+    setNotice(null);
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
@@ -56,11 +76,44 @@ export default function SignupPage() {
         body: JSON.stringify({ name, shopName, email, password, slug: addressesOn ? slug : undefined }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Sign-up failed");
+      if (!res.ok) {
+        if (res.status === 429 && data.retryAfter && step === "code") setCooldown(data.retryAfter);
+        throw new Error(data.error || "Sign-up failed");
+      }
+      setStep("code");
+      setCode("");
+      setCooldown(data.resendIn || 60);
+      setNotice(`We sent a 6-digit code to ${email}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign-up failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Step 2: the right code creates the account and signs the owner in.
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/signup/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.expired) {
+          setStep("form");
+          setCode("");
+        }
+        throw new Error(data.error || "Verification failed");
+      }
       setShopUrl(data.shopUrl || "");
       setAgentKey(data.agentKey);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign-up failed");
+      setError(err instanceof Error ? err.message : "Verification failed");
     } finally {
       setLoading(false);
     }
@@ -112,7 +165,7 @@ export default function SignupPage() {
         </div>
 
         <div className="relative text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
-          © QRtoPrint · Shop Dashboard
+          © QRtoPrint · <PoweredBy light className="inline" />
         </div>
       </div>
 
@@ -137,6 +190,58 @@ export default function SignupPage() {
                 You can create a new key any time in Settings → Print Agent.
               </p>
             </>
+          ) : step === "code" ? (
+            <>
+              <h1 className="text-2xl font-bold text-slate-900/90">Verify your email</h1>
+              <p className="mb-7 mt-1.5 text-sm text-slate-900/60">Enter the 6-digit code we sent to confirm this is your email.</p>
+              <form onSubmit={handleVerify} className="space-y-5">
+                {error && (
+                  <Alert tone="error" icon="⚠️">
+                    {error}
+                  </Alert>
+                )}
+                {notice && !error && <Alert tone="info" icon="✉️">{notice}</Alert>}
+                <input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  aria-label="6-digit verification code"
+                  placeholder="000000"
+                  className="w-full rounded-lg border border-slate-300 bg-white py-3 text-center text-3xl font-bold tracking-[0.5em] text-slate-900/90 outline-none focus:border-[color:var(--accent)]"
+                />
+                <button
+                  type="submit"
+                  disabled={loading || code.length !== 6}
+                  className="w-full rounded-lg bg-[color:var(--accent)] py-2.5 text-[0.9375rem] font-medium text-white transition active:bg-[color:var(--accent-dark)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                >
+                  {loading ? "Verifying…" : "Verify and create account"}
+                </button>
+                <div className="flex items-center justify-between text-sm">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep("form");
+                      setError(null);
+                      setNotice(null);
+                    }}
+                    className="font-medium text-slate-900/60 active:underline"
+                  >
+                    ← Change email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSubmit()}
+                    disabled={loading || cooldown > 0}
+                    className="font-medium text-[color:var(--accent)] active:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+                  >
+                    {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+                  </button>
+                </div>
+              </form>
+            </>
           ) : (
             <>
               <h1 className="text-2xl font-bold text-slate-900/90">Create your shop account</h1>
@@ -148,18 +253,7 @@ export default function SignupPage() {
                   </Alert>
                 )}
                 <TextField label="Your name" required value={name} onChange={setName} />
-                <TextField
-                  label="Shop name"
-                  required
-                  value={shopName}
-                  onChange={(next) => {
-                    setShopName(next);
-                    if (!slugTouched) {
-                      setSlug(slugify(next));
-                      setSlugAvailability(null);
-                    }
-                  }}
-                />
+                <TextField label="Shop name" required value={shopName} onChange={setShopName} />
                 {addressesOn && (
                   <div>
                     <TextField
@@ -167,10 +261,8 @@ export default function SignupPage() {
                       required
                       value={slug}
                       onChange={(v) => {
-                        const normalized = v.toLowerCase().replace(/[^a-z0-9-]/g, "");
                         setSlugTouched(true);
-                        setSlug(normalized);
-                        setSlugAvailability(null);
+                        setSlug(v.toLowerCase().replace(/[^a-z0-9-]/g, ""));
                       }}
                       helper={slug ? shopUrlForSlug(slug).replace(/^https?:\/\//, "") : "Your customers will use this address"}
                     />
@@ -186,7 +278,7 @@ export default function SignupPage() {
                   disabled={loading}
                   className="w-full rounded-lg bg-[color:var(--accent)] py-2.5 text-[0.9375rem] font-medium text-white transition active:bg-[color:var(--accent-dark)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
                 >
-                  {loading ? "Creating…" : "Create account"}
+                  {loading ? "Sending code…" : "Continue"}
                 </button>
                 <p className="text-center text-sm text-slate-900/60">
                   Already have an account?{" "}
@@ -197,6 +289,7 @@ export default function SignupPage() {
               </form>
             </>
           )}
+          <PoweredBy className="mt-8 lg:hidden" />
         </div>
       </div>
     </div>

@@ -29,7 +29,7 @@ const field =
   "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900/80 outline-none transition focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)]";
 
 const spec = (o: OrderDTO) =>
-  `${o.printType === "bw" ? "B&W" : "Color"} · ${o.paperSize} · ${o.pages}×${o.copies}${o.duplex ? " · Duplex" : ""}`;
+  `${o.printType === "bw" ? "B&W" : "Color"} · ${o.paperSize} · ${o.pages}×${o.copies}${o.duplex ? ` · Duplex (${o.duplexEdge === "short" ? "short" : "long"} edge)` : ""}${(o.pagesPerSheet ?? 1) > 1 ? ` · ${o.pagesPerSheet}-up` : ""}`;
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import type { PrinterDTO, PrinterHostDTO, AgentDTO, PaperSize } from "@/types/order";
 import LineIcon from "@/components/lexical/LineIcon";
-import { Card, CardHeader, Chip, Dialog, Field, SelectField, StatCard, TextField, Button, type ChipColor } from "@/components/lexical/ui";
+import { Card, CardHeader, Chip, Dialog, Field, SelectField, StatCard, TextField, Button } from "@/components/lexical/ui";
 
 const ALL_PAPER_SIZES: PaperSize[] = ["A4", "A3", "Legal", "Letter", "Photo"];
 
@@ -113,6 +113,18 @@ export default function PrintersPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  /** Staff accepts what Windows reported: B&W-only printers become "B&W only", colour-capable ones "B&W + Color". */
+  async function useDetectedType(p: PrinterDTO) {
+    if (typeof p.colorCapable !== "boolean") return;
+    const detected: PrinterDTO["type"] = p.colorCapable ? "both" : "bw";
+    await fetch(`/api/printers/${p._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: detected }),
+    });
+    await load();
   }
 
   async function handleDelete() {
@@ -336,10 +348,29 @@ export default function PrintersPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <Field k="Type" v={TYPE_LABEL[p.type]} />
+                    <Field k="Detected" v={p.colorCapable === true ? "Colour capable" : p.colorCapable === false ? "B&W only" : "Not detected yet"} />
                     <Field k="Orders today" v={p.ordersPrintedToday ?? 0} />
                     <Field k="Pages today" v={p.pagesPrintedToday ?? 0} />
                     <Field k="Last seen" v={p.lastSeenAt ? new Date(p.lastSeenAt).toLocaleString() : "—"} />
                   </div>
+
+                  {/* Windows says B&W only, but the printer is set up as a colour one: colour orders would print black. */}
+                  {p.colorCapable === false && p.type !== "bw" && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      <span>Windows says this printer prints B&amp;W only, but it is set to {TYPE_LABEL[p.type]}.</span>
+                      <button onClick={() => useDetectedType(p)} className="rounded-md border border-amber-400 px-2.5 py-1 font-semibold active:bg-amber-100">
+                        Set to B&amp;W only
+                      </button>
+                    </div>
+                  )}
+                  {p.colorCapable === true && p.type === "bw" && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                      <span>Windows says this printer can print colour. It is set to B&amp;W only.</span>
+                      <button onClick={() => useDetectedType(p)} className="rounded-md border border-sky-400 px-2.5 py-1 font-semibold active:bg-sky-100">
+                        Set to B&amp;W + Color
+                      </button>
+                    </div>
+                  )}
 
                   <div>
                     <div className="mb-1.5 text-xs text-slate-900/60">

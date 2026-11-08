@@ -82,6 +82,9 @@ cp .env.local.example .env.local
 ```
 At minimum, fill in `MONGODB_URI`, `JWT_SECRET`, and `AGENT_API_KEY` (generate random strings for the last two). Razorpay and WhatsApp variables are optional — the app works without them (simulated payment / console-logged notifications).
 
+### Welcome email (optional)
+When a new shop signs up it gets a welcome email with its customer link. Fill in `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` (and optionally `MAIL_FROM`) in `.env.local`; Gmail works with an App password. Without them the email is only logged and sign-up works as before. The code is in `src/lib/mail.ts`.
+
 ### 5. Create your shop-owner login
 ```bash
 npm run seed
@@ -118,7 +121,7 @@ Push to GitHub → import on vercel.com (auto-detects Next.js) → add the same 
 
 `/` now serves two things (see `src/app/page.tsx`):
 
-- **Main address, no shop** (e.g. `qr.lexicalsoftware.in/`) -> the marketing landing page (`src/components/landing/`).
+- **Main address, no shop** (e.g. `www.qr.lexicalsoftware.in/`) -> the marketing landing page (`src/components/landing/`).
 - **A shop sub-address** (`ravi-xerox.qr.lexicalsoftware.in`) **or an old `/?shop=<id>` link** -> the customer upload page (`src/components/CustomerOrder.tsx`, the former `page.tsx`).
 
 Landing buttons use the real auth: the header "Login" popup calls `/api/auth/login` and opens `/admin`; "Start free trial" goes to `/signup`.

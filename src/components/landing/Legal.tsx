@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SITE } from "./site";
 import { publicSans } from "./fonts";
 import { LEGAL_UPDATED, type LegalSection } from "./legalContent";
+import PoweredBy from "@/components/PoweredBy";
 
 export default function Legal({ title, sections }: { title: string; sections: LegalSection[] }) {
   return (
@@ -30,6 +31,9 @@ export default function Legal({ title, sections }: { title: string; sections: Le
           ))}
         </div>
       </main>
+      <footer className="border-t border-ink/10 py-6">
+        <PoweredBy />
+      </footer>
     </div>
   );
 }

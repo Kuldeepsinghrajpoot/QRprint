@@ -24,6 +24,8 @@ export interface IOrder extends Document {
   printType: PrintType;
   paperSize: PaperSize;
   duplex: boolean;
+  duplexEdge: "long" | "short"; // flip on the long or short edge (only matters when duplex)
+  pagesPerSheet: number; // 1, 2, 4, 6, 9 or 16 pages shrunk onto one side of a sheet
   binding: BindingType;
   pages: number;
   pageCountEstimated: boolean; // true when the customer typed a guess (Word/ZIP files aren't auto-counted)
@@ -44,6 +46,7 @@ export interface IOrder extends Document {
   printerError?: string;
   printAgentId?: string; // computer (Print Agent) that printed / is printing this order
   printedOn?: string; // Windows printer name it was sent to
+  readyBy?: "agent" | "staff"; // who set "ready": the Print Agent (really printed) or staff by hand (may never have printed)
   razorpayPaymentId?: string;
   cancelledAt?: Date;
   cancelledBy?: "customer" | "shop";
@@ -69,6 +72,8 @@ const OrderSchema = new Schema<IOrder>(
     printType: { type: String, enum: ["bw", "color"], required: true },
     paperSize: { type: String, enum: ["A4", "A3", "Legal", "Letter", "Photo"], default: "A4" },
     duplex: { type: Boolean, default: false },
+    duplexEdge: { type: String, enum: ["long", "short"], default: "long" },
+    pagesPerSheet: { type: Number, enum: [1, 2, 4, 6, 9, 16], default: 1 },
     binding: { type: String, enum: ["none", "spiral", "lamination"], default: "none" },
     pages: { type: Number, required: true, min: 1 },
     pageCountEstimated: { type: Boolean, default: false },
@@ -95,6 +100,7 @@ const OrderSchema = new Schema<IOrder>(
     printerError: { type: String },
     printAgentId: { type: String },
     printedOn: { type: String },
+    readyBy: { type: String, enum: ["agent", "staff"] },
     razorpayPaymentId: { type: String, unique: true, sparse: true },
     cancelledAt: { type: Date },
     cancelledBy: { type: String, enum: ["customer", "shop"] },

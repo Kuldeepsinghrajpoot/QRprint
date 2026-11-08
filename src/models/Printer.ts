@@ -24,6 +24,9 @@ export interface IPrinter extends Document {
   shopId: string;
   name: string;
   type: PrinterType;
+  // What Windows says about this printer, reported by the Print Agent: true = can print colour, false = B&W only,
+  // missing = not reported / Windows couldn't tell. Never changes `type` after the printer exists (staff's choice wins).
+  colorCapable?: boolean;
   systemPrinterName: string; // exact name as registered in Windows, used by the print agent
   // Which paper sizes this physical printer is actually loaded/able to print on.
   // Critical for Photo paper specifically — most shop printers don't have a photo
@@ -65,6 +68,7 @@ const PrinterSchema = new Schema<IPrinter>(
     shopId: { type: String, required: true, default: "main" },
     name: { type: String, required: true },
     type: { type: String, enum: ["bw", "color", "both"], default: "both" },
+    colorCapable: { type: Boolean },
     systemPrinterName: { type: String, required: true },
     supportedPaperSizes: {
       type: [String],

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import FluentIcon from "@/components/lexical/FluentIcon";
 import { Alert, LEX_FONT, TextField, PAGE_BG } from "@/components/lexical/ui";
+import PoweredBy from "@/components/PoweredBy";
 
 function LoginForm() {
   const router = useRouter();
@@ -83,7 +84,7 @@ function LoginForm() {
         </div>
 
         <div className="relative text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
-          © QRtoPrint · Shop Dashboard powered by  Lexical Software
+          © QRtoPrint · <PoweredBy light className="inline" />
         </div>
       </div>
 
@@ -125,6 +126,7 @@ function LoginForm() {
               </Link>
             </p>
           </form>
+          <PoweredBy className="mt-8 lg:hidden" />
         </div>
       </div>
     </div>

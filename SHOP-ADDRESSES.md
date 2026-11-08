@@ -1,14 +1,14 @@
 # Shop addresses (one sub-address per shop)
 
-Main address (dashboard, login, sign-up, Print Agent URL):  `https://qr.lexicalsoftware.in`
+Main address (dashboard, login, sign-up, Print Agent URL):  `https://www.qr.lexicalsoftware.in`
 Every shop's customer page:                                 `https://<shop-name>.qr.lexicalsoftware.in`
 
 ## 1. Vercel (once)
 1. Vercel → your project → **Settings → Environment Variables** (Production):
-   - `NEXT_PUBLIC_APP_URL` = `https://qr.lexicalsoftware.in`
+   - `NEXT_PUBLIC_APP_URL` = `https://www.qr.lexicalsoftware.in`
    - `NEXT_PUBLIC_SHOP_URL_TEMPLATE` = `https://{slug}.qr.lexicalsoftware.in`
    - plus your existing `MONGODB_URI`, `JWT_SECRET`, etc. (`AGENT_API_KEY` is now optional.)
-2. **Settings → Domains → Add**: `qr.lexicalsoftware.in`, and the wildcard `*.qr.lexicalsoftware.in`.
+2. **Settings → Domains → Add**: `www.qr.lexicalsoftware.in` (main address; also add `qr.lexicalsoftware.in` and redirect it to the www one), and the wildcard `*.qr.lexicalsoftware.in`.
 3. Redeploy (the two `NEXT_PUBLIC_` values are baked in at build time, so a redeploy is required).
 
 ## 2. DNS (once) — where lexicalsoftware.in is managed

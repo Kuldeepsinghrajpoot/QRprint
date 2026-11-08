@@ -33,6 +33,8 @@ const schema = z.object({
         ipAddress: str(100),
         tcpPort: z.number().int().min(0).max(65535).optional(),
         driver: str(200),
+        // Windows reports whether the printer can print colour. Omitted by old agents / when Windows can't tell.
+        colorCapable: z.boolean().nullish(),
       })
     )
     .max(50),
@@ -41,7 +43,7 @@ const schema = z.object({
 /**
  * POST /api/agent/printers/sync
  * The Print Agent reports every (real) printer installed on its computer, and which computer it is.
- *  - New printers are created automatically (type "both", A4/Legal/Letter) — staff can then adjust type /
+ *  - New printers are created automatically (type "bw" when Windows says it can't print colour, otherwise "both"; A4/Legal/Letter) — staff can then adjust type /
  *    loaded paper sizes on Admin → Printers.
  *  - Printers already known keep whatever staff configured.
  *  - With `agent` info, each printer remembers every computer it is installed on (name, model, port, IP…),
@@ -69,17 +71,23 @@ export async function POST(req: NextRequest) {
 
     if (names.length > 0) {
       await Printer.bulkWrite(
-        names.map((name) => ({
+        names.map((name) => {
+          const cc = reported.get(name)?.colorCapable; // true / false when Windows told us, otherwise undefined / null
+          return {
           updateOne: {
             filter: { shopId, systemPrinterName: name },
             update: {
               // With agent info the status is computed from the computers below; legacy agents set it directly.
-              $set: agent ? { lastSeenAt: now } : { status: "online", lastSeenAt: now },
+              $set: {
+                ...(agent ? { lastSeenAt: now } : { status: "online", lastSeenAt: now }),
+                ...(typeof cc === "boolean" ? { colorCapable: cc } : {}),
+              },
               $setOnInsert: {
                 shopId,
                 name,
                 systemPrinterName: name,
-                type: "both",
+                // A printer Windows says is B&W only starts as "B&W only" (everything else: "B&W + Color").
+                type: cc === false ? ("bw" as const) : ("both" as const),
                 supportedPaperSizes: ["A4", "Legal", "Letter"],
                 ordersPrintedToday: 0,
                 ...(agent ? { status: "online" } : {}),
@@ -87,7 +95,8 @@ export async function POST(req: NextRequest) {
             },
             upsert: true,
           },
-        }))
+          };
+        })
       );
     }
 

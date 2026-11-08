@@ -22,6 +22,8 @@ export interface OrderDTO {
   printType: PrintType;
   paperSize: PaperSize;
   duplex: boolean;
+  duplexEdge?: "long" | "short";
+  pagesPerSheet?: number;
   binding: BindingType;
   pages: number;
   pageCountEstimated: boolean;
@@ -42,6 +44,7 @@ export interface OrderDTO {
   printerError?: string;
   printAgentId?: string;
   printedOn?: string;
+  readyBy?: "agent" | "staff";
 
   createdAt: string;
 }
@@ -127,6 +130,7 @@ export interface PrinterDTO {
   _id: string;
   name: string;
   type: "bw" | "color" | "both";
+  colorCapable?: boolean; // detected by the Print Agent: true = colour capable, false = B&W only, missing = unknown
   systemPrinterName: string;
   supportedPaperSizes: PaperSize[];
   status: "online" | "offline" | "paper_jam" | "low_ink" | "out_of_paper";

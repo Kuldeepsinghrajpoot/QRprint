@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Menu, X } from "./Icon";
 
@@ -40,9 +39,9 @@ export default function MobileMenu() {
               {label}
             </a>
           ))}
-          <Link href="/signup" className="mt-1 block rounded-md bg-brand px-3 py-2.5 text-center text-white hover:bg-brand-dark">
+          <a href="/signup" className="mt-1 block rounded-md bg-brand px-3 py-2.5 text-center text-white hover:bg-brand-dark">
             Start free
-          </Link>
+          </a>
         </nav>
       )}
     </div>

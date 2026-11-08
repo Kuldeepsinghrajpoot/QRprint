@@ -1,3 +1,4 @@
+import { collectBlocked } from "@/lib/collectGuard";
 import { serverError } from "@/lib/apiError";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
@@ -15,6 +16,8 @@ const updateSchema = z.object({
   paymentStatus: z.enum(["pending", "paid", "refunded"]).optional(),
   // "cancelled" is not allowed here: use POST /api/orders/:id/shop-cancel (it also refunds and deletes the file)
   printStatus: z.enum(["queued", "printing", "ready", "collected", "failed"]).optional(),
+  // Only sent with "collected": staff confirm an order they marked ready by hand really did come out of the printer.
+  confirmPrinted: z.boolean().optional(),
   printerId: z.string().optional(),
   // "Print now" while the shop has auto-print switched off
   approvedForPrint: z.boolean().optional(),
@@ -47,35 +50,38 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     await connectDB();
     // Only orders of the signed-in shop can be changed.
-    const before = await Order.findOne({ _id: id, shopId: session.shopId }).select("printStatus printType paperSize").lean();
+    const before = await Order.findOne({ _id: id, shopId: session.shopId }).select("printStatus readyBy requiresManualPrint").lean();
     if (!before) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
-    if (parsed.data.printerId) {
-      // ...and only to a printer of the same shop.
-      const printer = mongoose.isValidObjectId(parsed.data.printerId)
-        ? await Printer.findOne({ _id: parsed.data.printerId, shopId: session.shopId })
-            .select("type supportedPaperSizes")
-            .lean()
-        : null;
-      if (!printer) return NextResponse.json({ error: "Printer not found" }, { status: 404 });
-      const supportsType = printer.type === "both" || printer.type === before.printType;
-      const supportsPaper = printer.supportedPaperSizes.includes(before.paperSize);
-      if (!supportsType || !supportsPaper) {
-        return NextResponse.json(
-          { error: "The selected printer does not support this order's print type and paper size" },
-          { status: 400 }
-        );
-      }
+    const { confirmPrinted, ...changes } = parsed.data;
+
+    // "Collected" deletes the customer's file for good, so it must never happen to an order that has not printed.
+    if (changes.printStatus === "collected") {
+      const blocked = collectBlocked(before, confirmPrinted);
+      if (blocked) return NextResponse.json(blocked, { status: 409 });
     }
-    const order = await Order.findOneAndUpdate({ _id: id, shopId: session.shopId }, parsed.data, { new: true });
+    if (changes.printerId) {
+      // ...and only to a printer of the same shop.
+      const mine = mongoose.isValidObjectId(changes.printerId) && (await Printer.exists({ _id: changes.printerId, shopId: session.shopId }));
+      if (!mine) return NextResponse.json({ error: "Printer not found" }, { status: 404 });
+    }
+    const order = await Order.findOneAndUpdate(
+      { _id: id, shopId: session.shopId },
+      {
+        $set: { ...changes, ...(changes.printStatus === "ready" ? { readyBy: "staff" as const } : {}) },
+        // sending it back to the printer starts the print story again
+        ...(changes.printStatus === "queued" ? { $unset: { readyBy: 1 as const, printerError: 1 as const } } : {}),
+      },
+      { new: true }
+    );
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
     // Privacy feature: once collected, delete the stored file (and clear its link from the order)
     let fileDeleted: boolean | undefined;
-    if (parsed.data.printStatus === "collected" && order.fileKey) {
+    if (changes.printStatus === "collected" && order.fileKey) {
       const result = await purgeOrderFile(order);
       fileDeleted = result.deleted;
       if (result.deleted) {
@@ -85,7 +91,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     // Notify the customer (WhatsApp/SMS) the moment staff mark it ready manually
-    if (parsed.data.printStatus === "ready" && before?.printStatus !== "ready") {
+    if (changes.printStatus === "ready" && before?.printStatus !== "ready") {
       sendOrderNotification({
         phone: order.customerPhone,
         customerName: order.customerName,

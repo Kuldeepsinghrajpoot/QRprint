@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { slugFromHostname } from "@/lib/shopUrl";
+import PoweredBy from "@/components/PoweredBy";
 import {
   composeCollage,
   composeTextOverlay,
@@ -246,6 +247,7 @@ export default function PhotoToolsPage() {
             ← Back to normal upload
           </Link>
         </div>
+        <PoweredBy className="mt-5" />
       </div>
     </div>
   );

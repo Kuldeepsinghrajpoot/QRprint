@@ -4,6 +4,7 @@ import { Printer } from "@/models/Printer";
 import { Order } from "@/models/Order";
 import { getSession } from "@/lib/session";
 import { serverError } from "@/lib/apiError";
+import { PRINTED_SIDES_EXPR } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,7 @@ export async function GET() {
         const since = p.tonerRefilledAt ?? p.createdAt;
         const [agg] = await Order.aggregate([
           { $match: { shopId: session.shopId, printerId: p._id, printStatus: { $in: ["ready", "collected"] }, updatedAt: { $gte: since } } },
-          { $group: { _id: null, pages: { $sum: { $multiply: ["$pages", "$copies"] } } } },
+          { $group: { _id: null, pages: { $sum: PRINTED_SIDES_EXPR } } },
         ]);
         const yieldPages = p.tonerYieldPages ?? 0;
         const used = agg?.pages ?? 0;

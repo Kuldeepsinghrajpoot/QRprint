@@ -8,9 +8,10 @@ import Link from "next/link";
 import Script from "next/script";
 import { detectPageCount, isAutoDetectable, isWordDoc, isZipFile } from "@/lib/pdf";
 import { enhanceScan } from "@/lib/photoTools";
-import { calcOrderPrice, PrintType, PaperSize, BindingType } from "@/lib/pricing";
+import { calcOrderPrice, PAGES_PER_SHEET_OPTIONS, PrintType, PaperSize, BindingType, DuplexEdge } from "@/lib/pricing";
 import PrinterMachine from "@/components/PrinterMachine";
 import type { OrderDTO, PricingConfigDTO } from "@/types/order";
+import PoweredBy from "@/components/PoweredBy";
 
 type Step = "upload" | "payment" | "processing" | "receipt";
 type PaymentMethod = "cash" | "online" | "free";
@@ -38,6 +39,8 @@ export default function CustomerPage() {
   const [printType, setPrintType] = useState<PrintType>("bw");
   const [paperSize, setPaperSize] = useState<PaperSize>("A4");
   const [duplex, setDuplex] = useState(false);
+  const [duplexEdge, setDuplexEdge] = useState<DuplexEdge>("long");
+  const [pagesPerSheet, setPagesPerSheet] = useState<number>(1);
   const [binding, setBinding] = useState<BindingType>("none");
   const [priority, setPriority] = useState(false);
   const [copies, setCopies] = useState(1);
@@ -193,6 +196,7 @@ export default function CustomerPage() {
       paperSize,
       printType,
       pages,
+      pagesPerSheet,
       copies,
       duplex,
       binding,
@@ -204,7 +208,7 @@ export default function CustomerPage() {
       gstEnabled: config.gstEnabled,
       gstPercent: config.gstPercent,
     });
-  }, [config, paperSize, printType, pages, copies, duplex, binding, priority]);
+  }, [config, paperSize, printType, pages, pagesPerSheet, copies, duplex, binding, priority]);
 
   // Shop Controls: opening hours and order rules the shop has set
   const hours = config ? shopOpenStatus(config) : { open: true, message: "" };
@@ -329,6 +333,8 @@ export default function CustomerPage() {
         printType,
         paperSize,
         duplex,
+        duplexEdge,
+        pagesPerSheet,
         binding,
         pages,
         pageCountEstimated,
@@ -618,6 +624,21 @@ export default function CustomerPage() {
                   </Field>
                 </div>
 
+                <Field label="Pages per sheet">
+                  <select
+                    value={pagesPerSheet}
+                    onChange={(e) => setPagesPerSheet(Number(e.target.value))}
+                    aria-label="Pages per sheet"
+                    className="input"
+                  >
+                    {PAGES_PER_SHEET_OPTIONS.map((n) => (
+                      <option key={n} value={n}>
+                        {n === 1 ? "1 (normal size)" : `${n} pages on one side`}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
                 <div className="divide-y divide-slate-100 rounded-[10px] border border-slate-200">
                   <SwitchRow
                     icon="layers"
@@ -636,6 +657,22 @@ export default function CustomerPage() {
                 </div>
               </div>
 
+              {duplex && (
+                <Field label="Flip on">
+                  <Segmented
+                    value={duplexEdge}
+                    onChange={setDuplexEdge}
+                    options={[
+                      { value: "long", label: "Long edge" },
+                      { value: "short", label: "Short edge" },
+                    ]}
+                  />
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {duplexEdge === "long" ? "Pages turn like a book (side binding)." : "Pages turn like a notepad (top binding)."}
+                  </p>
+                </Field>
+              )}
+
               {showDuplexTip && (
                 <div className="rounded-lg border border-[color:var(--accent)]/20 px-3.5 py-2.5 text-[12.5px] text-slate-700" style={{ background: "rgb(var(--accent-rgb) / 0.06)" }}>
                   This document has {pages} pages — turn on <strong>Double-sided</strong> to cut your paper cost.
@@ -645,6 +682,12 @@ export default function CustomerPage() {
               {config && price && !free && (
                 <div className="rounded-[10px] border border-dashed border-slate-300 bg-slate-50/70 px-4 py-3 text-sm tabular-nums">
                   <Row label="Pages" value={pages ? `${pages} page(s)${pageCountEstimated ? " (estimated)" : ""}` : "—"} />
+                  {pages > 0 && (pagesPerSheet > 1 || duplex) && (
+                    <Row
+                      label="Paper used"
+                      value={`${price.sides} side${price.sides === 1 ? "" : "s"}${duplex ? ` on ${price.sheets} sheet${price.sheets === 1 ? "" : "s"}` : ""}${copies > 1 ? ` × ${copies}` : ""}`}
+                    />
+                  )}
                   <Row label="Printing" value={`₹${price.baseCost}`} />
                   {price.duplexDiscount > 0 && <Row label="Double-sided discount" value={`− ₹${price.duplexDiscount}`} />}
                   {price.bindingCharge > 0 && <Row label="Binding" value={`+ ₹${price.bindingCharge}`} />}
@@ -783,6 +826,7 @@ export default function CustomerPage() {
             </div>
           )}
         </div>
+        <PoweredBy className="mt-5" />
       </div>
     </div>
   );

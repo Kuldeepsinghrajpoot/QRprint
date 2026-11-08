@@ -29,6 +29,8 @@ const createOrderSchema = z.object({
   printType: z.enum(["bw", "color"]),
   paperSize: z.enum(["A4", "A3", "Legal", "Letter", "Photo"]).default("A4"),
   duplex: z.boolean().default(false),
+  duplexEdge: z.enum(["long", "short"]).default("long"),
+  pagesPerSheet: z.union([z.literal(1), z.literal(2), z.literal(4), z.literal(6), z.literal(9), z.literal(16)]).default(1),
   binding: z.enum(["none", "spiral", "lamination"]).default("none"),
   pages: z.number().int().min(1).max(2000, "A single order can't exceed 2000 pages"),
   pageCountEstimated: z.boolean().default(false),
@@ -167,6 +169,7 @@ export async function POST(req: NextRequest) {
       paperSize: data.paperSize,
       printType: data.printType,
       pages: data.pages,
+      pagesPerSheet: data.pagesPerSheet,
       copies: data.copies,
       duplex: data.duplex,
       binding: data.binding,
@@ -238,8 +241,7 @@ export async function POST(req: NextRequest) {
     const requiresManualPrint = /\.(docx?|zip)$/i.test(data.fileName || "");
 
     const cancelKey = newCancelKey();
-    type CreatedOrder = Awaited<ReturnType<typeof Order.create>> extends (infer T)[] ? T : Awaited<ReturnType<typeof Order.create>>;
-    let order!: CreatedOrder;
+    let order;
     let token = generateToken();
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
@@ -255,6 +257,8 @@ export async function POST(req: NextRequest) {
           printType: data.printType,
           paperSize: data.paperSize,
           duplex: data.duplex,
+          duplexEdge: data.duplexEdge,
+          pagesPerSheet: data.pagesPerSheet,
           binding: data.binding,
           pages: data.pages,
           pageCountEstimated: data.pageCountEstimated,

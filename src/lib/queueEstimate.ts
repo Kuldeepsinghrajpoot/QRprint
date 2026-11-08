@@ -1,5 +1,6 @@
 import { Order } from "@/models/Order";
 import { Printer } from "@/models/Printer";
+import { PRINTED_SIDES_EXPR } from "@/lib/pricing";
 
 /** Rough speed of one printer. Real jobs vary (colour, duplex, big files), so the result is shown as "about". */
 const PAGES_PER_MINUTE = 20;
@@ -26,7 +27,7 @@ export async function estimateWait(shopId: string, before?: Date): Promise<WaitE
           ...(before ? { createdAt: { $lt: before } } : {}),
         },
       },
-      { $group: { _id: null, orders: { $sum: 1 }, pages: { $sum: { $multiply: ["$pages", "$copies"] } } } },
+      { $group: { _id: null, orders: { $sum: 1 }, pages: { $sum: PRINTED_SIDES_EXPR } } },
     ]),
     Printer.countDocuments({ shopId, status: "online" }),
   ]);

@@ -51,7 +51,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await connectDB();
 
     const { agentId, ...rest } = parsed.data;
-    const update = { ...rest, ...(agentId ? { printAgentId: agentId } : {}) };
+    const update = {
+      ...rest,
+      ...(agentId ? { printAgentId: agentId } : {}),
+      ...(parsed.data.printStatus === "ready" ? { readyBy: "agent" as const } : {}),
+    };
 
     let order;
     if (parsed.data.printStatus === "printing") {

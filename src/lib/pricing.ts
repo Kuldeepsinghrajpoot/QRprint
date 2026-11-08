@@ -29,11 +29,38 @@ function calcSetPrice(rate: TierRate, pages: number): number {
   return rate.page1 + midPages * rate.page2to10 + highPages * rate.page11plus;
 }
 
+/** "Pages per sheet" choices (like the browser's print dialog): several pages shrunk onto one side of a sheet. */
+export const PAGES_PER_SHEET_OPTIONS = [1, 2, 4, 6, 9, 16] as const;
+export type PagesPerSheet = (typeof PAGES_PER_SHEET_OPTIONS)[number];
+/** Which edge the double-sided pages flip on (like the browser's "Flip on long edge / short edge"). */
+export type DuplexEdge = "long" | "short";
+
+/**
+ * MongoDB expression for the printed sides of one order line (all copies): pages shrunk by "pages per sheet", times copies.
+ * Used by every counter that measures real printing (print counter, printer totals, toner, wait estimate).
+ */
+export const PRINTED_SIDES_EXPR = {
+  $multiply: [{ $ceil: { $divide: ["$pages", { $ifNull: ["$pagesPerSheet", 1] }] } }, "$copies"],
+};
+
+/** Printed sides: N pages per sheet shrinks `pages` pages onto ceil(pages / N) sides. */
+export function countSides(pages: number, pagesPerSheet: number = 1): number {
+  const n = Math.max(1, Math.floor(pagesPerSheet) || 1);
+  return Math.max(0, Math.ceil(Math.max(0, pages) / n));
+}
+
+/** Physical sheets of paper: double-sided puts two sides on each sheet. */
+export function countSheets(pages: number, pagesPerSheet: number, duplex: boolean): number {
+  const sides = countSides(pages, pagesPerSheet);
+  return duplex ? Math.ceil(sides / 2) : sides;
+}
+
 export interface PriceBreakdownInput {
   rates: RatesTable;
   paperSize: PaperSize;
   printType: PrintType;
   pages: number;
+  pagesPerSheet?: number; // 1 when omitted (older callers)
   copies: number;
   duplex: boolean;
   binding: BindingType;
@@ -47,6 +74,8 @@ export interface PriceBreakdownInput {
 }
 
 export interface PriceBreakdown {
+  sides: number; // printed sides after "pages per sheet"
+  sheets: number; // physical sheets (sides, halved when double-sided)
   baseCost: number;
   duplexDiscount: number;
   bindingCharge: number;
@@ -58,7 +87,11 @@ export interface PriceBreakdown {
 
 export function calcOrderPrice(input: PriceBreakdownInput): PriceBreakdown {
   const rate = input.rates[input.paperSize][input.printType];
-  const baseCost = calcSetPrice(rate, input.pages) * Math.max(1, input.copies);
+  // Both settings work together: pages-per-sheet shrinks the pages to fewer printed sides, and those sides are what is
+  // priced; double-sided then halves the sheets of paper (and keeps its own discount).
+  const sides = countSides(input.pages, input.pagesPerSheet ?? 1);
+  const sheets = countSheets(input.pages, input.pagesPerSheet ?? 1, input.duplex);
+  const baseCost = calcSetPrice(rate, sides) * Math.max(1, input.copies);
 
   const duplexDiscount = input.duplex
     ? Math.round((baseCost * input.duplexDiscountPercent) / 100)
@@ -66,7 +99,7 @@ export function calcOrderPrice(input: PriceBreakdownInput): PriceBreakdown {
 
   let bindingCharge = 0;
   if (input.binding === "spiral") bindingCharge = input.bindingSpiralCharge * input.copies;
-  if (input.binding === "lamination") bindingCharge = input.bindingLaminationCharge * input.pages * input.copies;
+  if (input.binding === "lamination") bindingCharge = input.bindingLaminationCharge * sheets * input.copies;
 
   const subtotal = Math.max(0, baseCost - duplexDiscount + bindingCharge);
   const priorityFee = input.priority ? Math.round((subtotal * input.priorityFeePercent) / 100) : 0;
@@ -74,7 +107,7 @@ export function calcOrderPrice(input: PriceBreakdownInput): PriceBreakdown {
   const gstAmount = input.gstEnabled ? Math.round((preTax * input.gstPercent) / 100) : 0;
   const total = preTax + gstAmount;
 
-  return { baseCost, duplexDiscount, bindingCharge, subtotal, priorityFee, gstAmount, total };
+  return { sides, sheets, baseCost, duplexDiscount, bindingCharge, subtotal, priorityFee, gstAmount, total };
 }
 
 /** Generates a short, human-friendly order token, e.g. "A247" */

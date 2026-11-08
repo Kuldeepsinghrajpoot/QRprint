@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import type { OrderDTO, PrinterDTO, PricingConfigDTO } from "@/types/order";
 import LineIcon from "@/components/lexical/LineIcon";
 import { CANCEL_WINDOW_MS } from "@/lib/orderTiming";
-import { Alert, Avatar, Button, Card, Chip, StatCard, Switch, type Tone } from "@/components/lexical/ui";
+import { Alert, Avatar, Button, Card, Chip, StatCard, Switch } from "@/components/lexical/ui";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -179,15 +179,25 @@ export default function AdminQueuePage() {
 
   async function updateOrder(
     id: string,
-    patch: Partial<Pick<OrderDTO, "paymentStatus" | "printStatus">> & { printerId?: string }
+    patch: Partial<Pick<OrderDTO, "paymentStatus" | "printStatus">> & { printerId?: string; confirmPrinted?: boolean }
   ) {
-    setOrders((prev) => prev.map((o) => (o._id === id ? { ...o, ...patch } : o)));
+    const { confirmPrinted: _confirm, ...shown } = patch; // confirmPrinted is only for the server
+    void _confirm;
+    setOrders((prev) => prev.map((o) => (o._id === id ? { ...o, ...shown } : o)));
 
     const res = await fetch(`/api/orders/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
+    if (!res.ok) {
+      // The server said no (for example: collecting an order that has not printed). Undo the optimistic change and say why.
+      const err = await res.json().catch(() => ({}));
+      setBanner(`⚠️ ${typeof err.error === "string" ? err.error : "That change was not saved."}`);
+      setTimeout(() => setBanner(null), 8000);
+      fetchOrders();
+      return;
+    }
     const updated: OrderDTO = await res.json();
 
     if (patch.printStatus === "ready" && !knownReadyIds.current.has(id)) {
@@ -514,17 +524,13 @@ function orderWhere(order: OrderDTO, printers: PrinterDTO[]): string {
 
 /** "On hold" countdown: the customer can still cancel, so the order isn't sent to the printer yet. */
 function HoldChip({ createdAt }: { createdAt: string }) {
-  const [now, setNow] = useState(() => Date.now());
-  const left = Math.ceil((new Date(createdAt).getTime() + CANCEL_WINDOW_MS - now) / 1000);
-
+  const [, tick] = useState(0);
+  const left = Math.ceil((new Date(createdAt).getTime() + CANCEL_WINDOW_MS - Date.now()) / 1000);
   useEffect(() => {
     if (left <= 0) return;
-    const tick = () => setNow(Date.now());
-    tick();
-    const t = setInterval(tick, 1000);
+    const t = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(t);
-  }, [createdAt, left]);
-
+  }, [left > 0]); // eslint-disable-line react-hooks/exhaustive-deps -- only (re)start while the hold is active
   if (left <= 0) return null;
   return <Chip color="info">On hold, customer can still cancel · prints in {left}s</Chip>;
 }
@@ -542,7 +548,7 @@ function OrderCard({
   printers: PrinterDTO[];
   onUpdate: (
     id: string,
-    patch: Partial<Pick<OrderDTO, "paymentStatus" | "printStatus" | "approvedForPrint">> & { printerId?: string }
+    patch: Partial<Pick<OrderDTO, "paymentStatus" | "printStatus" | "approvedForPrint">> & { printerId?: string; confirmPrinted?: boolean }
   ) => void;
   onAnnounce: (name: string) => void;
   onCancel: (id: string, reason: string) => Promise<void>;
@@ -551,12 +557,6 @@ function OrderCard({
 }) {
   const needsPaperChange =
     order.paperSize !== "A4" && !order.printerId && order.printStatus === "queued" && order.paymentStatus !== "pending";
-
-  const compatiblePrinters = printers.filter(
-    (p) =>
-      (p.type === "both" || p.type === order.printType) &&
-      p.supportedPaperSizes.includes(order.paperSize)
-  );
 
   const awaitingOk =
     autoPrintOff && order.printStatus === "queued" && order.paymentStatus === "paid" && !order.approvedForPrint && !order.requiresManualPrint;
@@ -573,9 +573,11 @@ function OrderCard({
             : "primary";
 
   const [confirming, setConfirming] = useState(false);
+  // Skipping the printer (Mark Ready) and collecting an order that never printed both ask first: they can't be undone.
+  const [confirmReady, setConfirmReady] = useState(false);
+  const [confirmCollect, setConfirmCollect] = useState(false);
   const [reason, setReason] = useState("Customer asked");
   const [cancelling, setCancelling] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
   const canCancel = ["queued", "printing", "failed"].includes(order.printStatus);
   const refundHint =
     order.paymentStatus === "paid"
@@ -588,16 +590,6 @@ function OrderCard({
   const where = orderWhere(order, printers);
   const showReadyBtn = (order.printStatus === "queued" || order.printStatus === "printing") && order.paymentStatus !== "pending";
   const pill = "rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600";
-  const readyAgeMinutes = order.printStatus === "ready" && order.updatedAt ? Math.round((now - new Date(order.updatedAt).getTime()) / 60000) : 0;
-  const showReadyAge = order.printStatus === "ready" && order.updatedAt && now - new Date(order.updatedAt).getTime() > 15 * 60000;
-
-  useEffect(() => {
-    if (order.printStatus !== "ready" || !order.updatedAt) return;
-    const tick = () => setNow(Date.now());
-    tick();
-    const t = setInterval(tick, 60000);
-    return () => clearInterval(t);
-  }, [order.printStatus, order.updatedAt]);
 
   return (
     <div className={`overflow-hidden rounded-[10px] border bg-white ${needsPaperChange || order.priority ? "border-amber-300" : "border-slate-200"}`}>
@@ -629,13 +621,16 @@ function OrderCard({
       <div className="flex flex-wrap gap-1.5 px-4 pb-4 sm:px-5">
         <span className={pill}>{order.printType === "bw" ? "B&W" : "Color"}</span>
         <span className={pill}>{order.paperSize}</span>
-        {order.duplex && <span className={pill}>Duplex</span>}
+        {order.duplex && <span className={pill}>Duplex · {order.duplexEdge === "short" ? "short edge" : "long edge"}</span>}
+        {(order.pagesPerSheet ?? 1) > 1 && <span className={pill}>{order.pagesPerSheet}-up</span>}
         {order.binding !== "none" && <span className={pill}>{order.binding}</span>}
         {order.paymentStatus === "pending" && <Chip color="warning">Cash Pending</Chip>}
         {order.paymentStatus === "paid" && <Chip color="success">Paid</Chip>}
         {order.paymentStatus === "refunded" && <Chip color="warning">Refunded</Chip>}
         {awaitingOk && <Chip color="warning">Waiting for your OK, auto-print is off</Chip>}
-        {showReadyAge && <Chip color="warning">Not collected for {readyAgeMinutes} min</Chip>}
+        {order.printStatus === "ready" && order.updatedAt && Date.now() - new Date(order.updatedAt).getTime() > 15 * 60000 && (
+          <Chip color="warning">Not collected for {Math.round((Date.now() - new Date(order.updatedAt).getTime()) / 60000)} min</Chip>
+        )}
         {!awaitingOk && order.printStatus === "queued" && order.paymentStatus !== "pending" && <HoldChip createdAt={order.createdAt} />}
         {order.printStatus === "printing" && <Chip color="info">Printing…</Chip>}
         {order.printStatus === "ready" && <Chip color="success">Ready</Chip>}
@@ -694,6 +689,65 @@ function OrderCard({
         </div>
       )}
 
+      {confirmReady && (
+        <div className="mx-4 mb-4 rounded-md border border-amber-200 bg-amber-50 p-3.5 sm:mx-5">
+          <div className="text-[13px] font-semibold text-amber-800">This order has not finished printing</div>
+          <p className="mt-1 text-xs text-slate-900/70">
+            {order.printStatus === "printing"
+              ? "It is with the printer right now. Marking it ready tells the customer it is done, even if nothing came out."
+              : "Marking it ready skips the printer, so it will NOT be printed. Choose this only if you printed it yourself."}
+          </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <Button variant="light" tone="secondary" size="sm" onClick={() => setConfirmReady(false)}>
+              {order.printStatus === "printing" ? "Wait for the printer" : "Keep it in the queue"}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setConfirmReady(false);
+                onUpdate(order._id, { printStatus: "ready" });
+              }}
+            >
+              I printed it myself, mark ready
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {confirmCollect && (
+        <div className="mx-4 mb-4 rounded-md border border-amber-200 bg-amber-50 p-3.5 sm:mx-5">
+          <div className="text-[13px] font-semibold text-amber-800">This order was marked ready by hand. Was it printed?</div>
+          <p className="mt-1 text-xs text-slate-900/70">
+            Collecting deletes the customer&apos;s file for good, so it can no longer be printed. If it never came out of the printer, print it again first.
+          </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                setConfirmCollect(false);
+                onUpdate(order._id, { printStatus: "queued" });
+              }}
+            >
+              Not printed, print it now
+            </Button>
+            <Button
+              variant="light"
+              tone="secondary"
+              size="sm"
+              onClick={() => {
+                setConfirmCollect(false);
+                onUpdate(order._id, { printStatus: "collected", confirmPrinted: true });
+              }}
+            >
+              Yes, printed. Mark collected
+            </Button>
+            <Button variant="light" tone="secondary" size="sm" onClick={() => setConfirmCollect(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
       {confirming && (
         <div className="mx-4 mb-4 rounded-md border border-rose-200 bg-rose-50 p-3.5 sm:mx-5">
           <div className="text-[13px] font-semibold text-rose-700">Cancel this print?</div>
@@ -746,18 +800,39 @@ function OrderCard({
           </Button>
         )}
         {showReadyBtn && (
-          <Button size="sm" className="flex-1 sm:flex-none" onClick={() => onUpdate(order._id, { printStatus: "ready" })}>
+          <Button
+            size="sm"
+            className="flex-1 sm:flex-none"
+            onClick={() => (order.requiresManualPrint ? onUpdate(order._id, { printStatus: "ready" }) : setConfirmReady(true))}
+          >
             {order.printStatus === "printing" ? "Mark Ready (manual)" : "Mark Ready"}
           </Button>
         )}
         {order.printStatus === "ready" && (
           <>
-            <Button variant="light" tone="secondary" size="sm" className="flex-1 sm:flex-none" onClick={() => onUpdate(order._id, { printStatus: "collected" })}>
+            <Button
+              variant="light"
+              tone="secondary"
+              size="sm"
+              className="flex-1 sm:flex-none"
+              onClick={() =>
+                // marked ready by hand and never printed by the agent: collecting would delete the file for good
+                order.readyBy === "staff" && !order.requiresManualPrint ? setConfirmCollect(true) : onUpdate(order._id, { printStatus: "collected" })
+              }
+            >
               Mark Collected
             </Button>
+            {order.fileUrl && !order.requiresManualPrint && (
+              <Button variant="light" tone="primary" size="sm" className="flex-1 sm:flex-none" onClick={() => onUpdate(order._id, { printStatus: "queued" })}>
+                Print again
+              </Button>
+            )}
             <Button variant="light" tone="success" size="sm" className="flex-1 sm:flex-none" onClick={() => onAnnounce(order.customerName)}>
               Announce again
             </Button>
+            {!order.fileUrl && !order.requiresManualPrint && (
+              <span className="text-xs text-slate-900/50">The customer&apos;s file is already deleted, so it can&apos;t be printed again.</span>
+            )}
           </>
         )}
         {canCancel && !confirming && (
@@ -765,26 +840,21 @@ function OrderCard({
             Cancel print
           </Button>
         )}
-        {printers.length > 0 && order.printStatus === "queued" &&
-          (compatiblePrinters.length > 0 ? (
-            <select
-              defaultValue=""
-              onChange={(e) => e.target.value && onUpdate(order._id, { printerId: e.target.value })}
-              aria-label="Assign printer"
-              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900/80 outline-none transition focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)]"
-            >
-              <option value="">Assign printer…</option>
-              {compatiblePrinters.map((p) => (
-                <option key={p._id} value={p._id}>
-                  {p.name} ({p.status}){computersLabel(p) ? ` — ${computersLabel(p)}` : ""}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span className="text-xs text-slate-500">
-              No printer supports {order.printType === "color" ? "color" : "B&W"} on {order.paperSize}
-            </span>
-          ))}
+        {printers.length > 0 && order.printStatus === "queued" && (
+          <select
+            defaultValue=""
+            onChange={(e) => e.target.value && onUpdate(order._id, { printerId: e.target.value })}
+            aria-label="Assign printer"
+            className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900/80 outline-none transition focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)]"
+          >
+            <option value="">Assign printer…</option>
+            {printers.map((p) => (
+              <option key={p._id} value={p._id}>
+                {p.name} ({p.status}){computersLabel(p) ? ` — ${computersLabel(p)}` : ""}
+              </option>
+            ))}
+          </select>
+        )}
         <span className="ml-auto flex items-center gap-4 text-[13px] font-medium text-[color:var(--accent)]">
           {order.fileUrl && ["queued", "printing", "ready"].includes(order.printStatus) && (
             <a href={order.fileUrl} target="_blank" rel="noreferrer" className="active:underline">

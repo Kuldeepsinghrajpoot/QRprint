@@ -56,7 +56,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   draw("Order Details", { f: bold, size: 12 });
   draw(`Paper Size: ${order.paperSize}    Print Type: ${order.printType === "bw" ? "Black & White" : "Color"}`);
-  draw(`Pages x Copies: ${order.pages} x ${order.copies}    Duplex: ${order.duplex ? "Yes" : "No"}`);
+  draw(`Pages x Copies: ${order.pages} x ${order.copies}    Duplex: ${order.duplex ? `Yes (${order.duplexEdge === "short" ? "short" : "long"} edge)` : "No"}`);
+  if ((order.pagesPerSheet ?? 1) > 1) draw(`Pages per sheet: ${order.pagesPerSheet}`);
   draw(`Binding: ${order.binding === "none" ? "-" : order.binding}    Priority: ${order.priority ? "Yes" : "No"}`);
   y -= 6;
 

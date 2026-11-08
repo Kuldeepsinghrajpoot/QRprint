@@ -4,6 +4,7 @@ import { useState } from "react";
 import AdminNav from "@/components/AdminNav";
 import AdminTopBar from "@/components/AdminTopBar";
 import { LEX_FONT, PAGE_BG } from "@/components/lexical/ui";
+import PoweredBy from "@/components/PoweredBy";
 
 /** Lexical-style admin frame: vertical nav (left) + floating top navbar + content. */
 export default function AdminShell({
@@ -29,8 +30,8 @@ export default function AdminShell({
       <div className="flex min-w-0 flex-1 flex-col pt-16">
         <AdminTopBar userName={userName} role={role} onMenu={() => setNavOpen(true)} />
         <main className="mx-auto w-full max-w-[1440px] flex-1 p-4 sm:p-6">{children}</main>
-        <footer className="px-6 pb-5 text-center text-xs text-slate-900/40">
-          QRtoPrint · Shop Dashboard
+        <footer className="px-6 pb-5">
+          <PoweredBy />
         </footer>
       </div>
     </div>

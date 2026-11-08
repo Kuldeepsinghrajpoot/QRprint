@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
+import PoweredBy from "@/components/PoweredBy";
 
 interface TrackedOrder {
   token: string;
@@ -139,6 +140,7 @@ export default function TrackOrderPage({ params }: { params: Promise<{ token: st
             </>
           )}
         </div>
+        <PoweredBy className="mt-5" />
       </div>
     </div>
   );

@@ -31,14 +31,14 @@ export async function GET(req: NextRequest) {
     const time = new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
     const header = [
-      "Date", "Time", "Token", "Customer", "Phone", "Print type", "Paper", "Duplex", "Binding", "Pages", "Copies",
+      "Date", "Time", "Token", "Customer", "Phone", "Print type", "Paper", "Duplex", "Flip edge", "Pages per sheet", "Binding", "Pages", "Copies",
       "Subtotal", "Priority fee", "GST", "Total", "Payment method", "Payment status", "Print status", "Cancelled by", "Cancel reason",
     ];
     const rows = orders.map((o) => {
       const at = new Date(o.createdAt);
       return [
         date.format(at), time.format(at), o.token, o.customerName, o.customerPhone, o.printType === "bw" ? "B&W" : "Color",
-        o.paperSize, o.duplex ? "Yes" : "No", o.binding, o.pages, o.copies, o.subtotal, o.priorityFee, o.gstAmount, o.totalPrice,
+        o.paperSize, o.duplex ? "Yes" : "No", o.duplex ? (o.duplexEdge === "short" ? "Short" : "Long") : "", o.pagesPerSheet ?? 1, o.binding, o.pages, o.copies, o.subtotal, o.priorityFee, o.gstAmount, o.totalPrice,
         o.paymentMethod, o.paymentStatus, o.printStatus, o.cancelledBy, o.cancelReason,
       ];
     });

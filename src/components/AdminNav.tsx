@@ -117,15 +117,6 @@ export default function AdminNav({
             );
           })}
         </nav>
-
-        {/* <Link
-          href="/admin/qr"
-          onClick={onClose}
-          className="m-4 flex items-center justify-between whitespace-nowrap rounded-md px-4 py-2.5 text-sm font-semibold"
-          style={{ background: "rgb(var(--accent-rgb) / 0.08)", color: "var(--accent)" }}
-        >
-          Get customer QR <span aria-hidden>→</span>
-        </Link> */}
       </aside>
     </>
   );

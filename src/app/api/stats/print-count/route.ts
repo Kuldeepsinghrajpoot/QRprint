@@ -4,6 +4,7 @@ import { Order } from "@/models/Order";
 import { PricingConfig } from "@/models/PricingConfig";
 import { getSession } from "@/lib/session";
 import { serverError } from "@/lib/apiError";
+import { PRINTED_SIDES_EXPR } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 
@@ -46,11 +47,11 @@ export async function GET() {
       {
         $group: {
           _id: "$printType",
-          pagesAll: { $sum: { $multiply: ["$pages", "$copies"] } },
+          pagesAll: { $sum: PRINTED_SIDES_EXPR },
           ordersAll: { $sum: 1 },
-          pagesMonth: { $sum: { $cond: [{ $gte: ["$updatedAt", start.month] }, { $multiply: ["$pages", "$copies"] }, 0] } },
+          pagesMonth: { $sum: { $cond: [{ $gte: ["$updatedAt", start.month] }, PRINTED_SIDES_EXPR, 0] } },
           ordersMonth: { $sum: { $cond: [{ $gte: ["$updatedAt", start.month] }, 1, 0] } },
-          pagesToday: { $sum: { $cond: [{ $gte: ["$updatedAt", start.today] }, { $multiply: ["$pages", "$copies"] }, 0] } },
+          pagesToday: { $sum: { $cond: [{ $gte: ["$updatedAt", start.today] }, PRINTED_SIDES_EXPR, 0] } },
           ordersToday: { $sum: { $cond: [{ $gte: ["$updatedAt", start.today] }, 1, 0] } },
         },
       },
