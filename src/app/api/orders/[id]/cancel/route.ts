@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
 import { purgeOrderFile } from "@/lib/fileCleanup";
-import { isRazorpayConfigured, refundRazorpayPayment } from "@/lib/razorpay";
+import { getRazorpayCreds, refundRazorpayPayment } from "@/lib/razorpay";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { CANCEL_WINDOW_MS } from "@/lib/orderTiming";
 import { cancelKeyMatches } from "@/lib/cancelKey";
@@ -70,9 +70,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     let refundIssued = false;
-    if (order.paymentMethod === "online" && order.paymentStatus === "paid" && order.razorpayPaymentId && isRazorpayConfigured()) {
+    const rzpCreds = order.paymentMethod === "online" ? await getRazorpayCreds(order.shopId) : null;
+    if (order.paymentMethod === "online" && order.paymentStatus === "paid" && order.razorpayPaymentId && rzpCreds) {
       try {
-        await refundRazorpayPayment(order.razorpayPaymentId);
+        await refundRazorpayPayment(rzpCreds, order.razorpayPaymentId);
         refundIssued = true;
         cancelled.paymentStatus = "refunded";
         await cancelled.save();

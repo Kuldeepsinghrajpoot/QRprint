@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
-import Script from "next/script";
 import "./globals.css";
 import { PALETTE_INIT_SCRIPT } from "@/lib/palettes";
-import { publicSans } from "@/components/landing/fonts";
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.qr.lexicalsoftware.in";
 const DESCRIPTION =
@@ -22,15 +19,13 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${publicSans.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="min-h-full flex flex-col">
-        {children}
-        <Script id="palette-init" strategy="beforeInteractive">
-          {PALETTE_INIT_SCRIPT}
-        </Script>
-      </body>
+    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: PALETTE_INIT_SCRIPT }} />
+      </head>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

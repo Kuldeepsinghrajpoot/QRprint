@@ -9,7 +9,7 @@ import { PricingConfig, DEFAULT_RATES } from "@/models/PricingConfig";
 import { Customer, pointsForAmount } from "@/models/Customer";
 import { calcOrderPrice, generateToken } from "@/lib/pricing";
 import { sendOrderNotification, orderPlacedMessage } from "@/lib/notify";
-import { isRazorpayConfigured, verifyRazorpaySignature, fetchRazorpayOrder } from "@/lib/razorpay";
+import { getRazorpayCreds, verifyRazorpaySignature, fetchRazorpayOrder } from "@/lib/razorpay";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { getSession } from "@/lib/session";
 import { publicUrlForKey } from "@/lib/storage";
@@ -192,12 +192,13 @@ export async function POST(req: NextRequest) {
     // - Online + Razorpay NOT configured: simulated test-mode flow, marked "paid" immediately
     let paymentStatus: "pending" | "paid" = free ? "paid" : "pending";
     if (paymentMethod === "online") {
-      if (isRazorpayConfigured()) {
+      const rzpCreds = await getRazorpayCreds(shopId);
+      if (rzpCreds) {
         const hasSignature = data.razorpayOrderId && data.razorpayPaymentId && data.razorpaySignature;
         if (!hasSignature) {
           return NextResponse.json({ error: "Missing payment verification details" }, { status: 400 });
         }
-        const valid = verifyRazorpaySignature({
+        const valid = verifyRazorpaySignature(rzpCreds, {
           orderId: data.razorpayOrderId!,
           paymentId: data.razorpayPaymentId!,
           signature: data.razorpaySignature!,
@@ -210,7 +211,7 @@ export async function POST(req: NextRequest) {
         // order" — not that the amount was right. /razorpay/create takes the
         // amount from the client, so check what was actually charged against
         // the price we calculated, otherwise a ₹1 payment could buy any order.
-        const rzpOrder = await fetchRazorpayOrder(data.razorpayOrderId!);
+        const rzpOrder = await fetchRazorpayOrder(rzpCreds, data.razorpayOrderId!);
         if (Number(rzpOrder.amount) !== Math.round(price.total * 100) || rzpOrder.currency !== "INR") {
           return NextResponse.json({ error: "Payment amount does not match the order total" }, { status: 400 });
         }

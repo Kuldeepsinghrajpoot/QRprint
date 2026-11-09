@@ -4,7 +4,6 @@ import {
   Tag, QrCode, BarChart3, Languages, Trash2, MessageCircle, Mail, MapPin, Gift,
 } from "./Icon";
 import Image from "next/image";
-import Link from "next/link";
 import { SITE } from "./site";
 import { publicSans } from "./fonts";
 import LoginModal from "./LoginModal";
@@ -111,14 +110,8 @@ export default function Landing() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
           <a href="#" className="flex items-center gap-2.5 font-display text-2xl font-extrabold text-brand"><Image src="/chhapo-logo.svg" alt="" width={36} height={36} />{SITE.name}</a>
           <nav className="hidden gap-7 text-sm font-medium md:flex">
-            {([
-              ["How it works", "#how"],
-              ["Features", "#features"],
-              ["Pricing", "#pricing"],
-              ["FAQ", "#faq"],
-              ["Manual Guide", "/print-agent"],
-            ] as const).map(([label, href]) => (
-              <Link key={href} href={href} className="hover:text-brand">{label}</Link>
+            {[["How it works", "#how"], ["Features", "#features"], ["Pricing", "#pricing"], ["FAQ", "#faq"]].map(([l, h]) => (
+              <a key={h} href={h} className="hover:text-brand">{l}</a>
             ))}
           </nav>
           <div className="flex items-center gap-3">
@@ -266,7 +259,7 @@ export default function Landing() {
           <div className="rounded-md bg-brand px-8 py-14 text-center text-white">
             <h2 className="mx-auto max-w-2xl font-display text-4xl font-extrabold">Set up in about 10 minutes. Free for a limited period.</h2>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Link href="/signup" className="rounded-md bg-sun px-7 py-3 font-semibold text-ink">Start free</Link>
+              <a href="/signup" className="rounded-md bg-sun px-7 py-3 font-semibold text-ink">Start free</a>
               <a href={wa} className="rounded-md border-2 border-white/40 px-7 py-3 font-semibold">Talk on WhatsApp</a>
             </div>
           </div>
@@ -296,11 +289,11 @@ export default function Landing() {
         </div>
         <div className="border-t border-ink/10 py-5 text-center text-sm text-ink/60">
           <nav className="mb-2 flex flex-wrap justify-center gap-x-5 gap-y-1 font-medium">
-            <Link href="/print-agent" className="hover:text-brand">Print Agent</Link>
-            <Link href="/terms" className="hover:text-brand">Terms</Link>
-            <Link href="/privacy-policy" className="hover:text-brand">Privacy Policy</Link>
-            <Link href="/login" className="hover:text-brand">Login</Link>
-            <Link href="/signup" className="hover:text-brand">Sign up</Link>
+            <a href="/print-agent" className="hover:text-brand">Print Agent</a>
+            <a href="/terms" className="hover:text-brand">Terms</a>
+            <a href="/privacy-policy" className="hover:text-brand">Privacy Policy</a>
+            <a href="/login" className="hover:text-brand">Login</a>
+            <a href="/signup" className="hover:text-brand">Sign up</a>
           </nav>
           © {new Date().getFullYear()} {SITE.name}. Powered by{" "}
           <a href={SITE.poweredBy.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand hover:underline">{SITE.poweredBy.name}</a>

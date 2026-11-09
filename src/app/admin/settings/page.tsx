@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import type { PricingConfigDTO } from "@/types/order";
 import LineIcon from "@/components/lexical/LineIcon";
 import AgentKeyBox from "@/components/AgentKeyBox";
+import RazorpayCard from "@/components/RazorpayCard";
 import TeamCard from "@/components/TeamCard";
 import ChangePasswordCard from "@/components/ChangePasswordCard";
 import { Alert, Button, Card, CardHeader, Switch, TextField } from "@/components/lexical/ui";
@@ -181,6 +182,9 @@ export default function SettingsPage() {
             </Button>
           </div>
         </Card>
+
+        {/* Online payments: the shop's own Razorpay keys */}
+        <RazorpayCard />
 
         {/* Queue control */}
         <Card>

@@ -11,6 +11,9 @@ export interface IShop extends Document {
   oldSlugs?: string[]; // earlier names — they keep opening this shop, so printed QR codes never break
   agentKeyHash?: string; // sha256 of the Print Agent key — the key itself is shown once and never stored
   agentKeyHint: string; // last 4 characters, so the owner can tell which key is active
+  razorpayKeyId?: string; // this shop's own Razorpay Key ID (public, like rzp_live_xxx)
+  razorpaySecretEnc?: string; // the Key Secret, encrypted (AES-256-GCM) - never returned to the browser
+  razorpaySecretHint?: string; // last 4 characters of the secret, so the owner can recognise it
   createdAt: Date;
 }
 
@@ -22,6 +25,9 @@ const ShopSchema = new Schema<IShop>(
     oldSlugs: { type: [String], default: [], index: true },
     agentKeyHash: { type: String, unique: true, sparse: true },
     agentKeyHint: { type: String, default: "" },
+    razorpayKeyId: { type: String },
+    razorpaySecretEnc: { type: String },
+    razorpaySecretHint: { type: String },
   },
   { timestamps: true }
 );

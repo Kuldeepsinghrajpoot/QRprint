@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: "Download, install and use the QRtoPrint Print Agent on your shop's Windows PC.",
 };
 
-const RELEASES = "https://github.com/Kuldeepsinghrajpoot/QR-printer-agent/releases/download/v1.0.12/QRtoPrint-Setup-1.0.12.exe";
+const RELEASES = "https://github.com/Kuldeepsinghrajpoot/QR-printer-agent/releases";
 
 type Step = { t: string; d: string };
 

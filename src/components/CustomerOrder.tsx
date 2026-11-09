@@ -443,6 +443,12 @@ export default function CustomerPage() {
       className="flex-1 flex justify-center px-3 sm:px-4 py-5 sm:py-8"
       style={{ fontFamily: LEX_FONT, background: PAGE_BG }}
     >
+      {/* Public Sans — same font as the shop dashboard (React 19 hoists this into <head>) */}
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap"
+        precedence="default"
+      />
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       <div className="w-full max-w-md md:max-w-lg">
         <header className="mb-5 flex items-center gap-3 px-1">

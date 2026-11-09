@@ -40,6 +40,12 @@ function LoginForm() {
 
   return (
     <div className="flex min-h-screen flex-1" style={{ fontFamily: LEX_FONT, background: PAGE_BG }}>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap"
+        precedence="default"
+      />
+
       {/* Brand panel */}
       <div
         className="relative hidden flex-1 flex-col justify-between overflow-hidden p-12 text-white lg:flex"

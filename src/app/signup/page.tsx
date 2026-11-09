@@ -25,32 +25,32 @@ export default function SignupPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [shopUrl, setShopUrl] = useState("");
   // Shop address (sub-address name): follows the shop name until the user edits it.
-  const [slugOverride, setSlugOverride] = useState<string | null>(null);
-  const slug = slugOverride ?? slugify(shopName);
-  const [slugAvailability, setSlugAvailability] = useState<{ slug: string; note: { ok: boolean; text: string } } | null>(null);
+  const [slug, setSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [slugNote, setSlugNote] = useState<{ ok: boolean; text: string } | null>(null);
   const addressesOn = !!shopUrlForSlug("x");
-  const slugError = slug ? validateSlug(slug) : null;
-  const slugNote =
-    !addressesOn || !slug
-      ? null
-      : slugError
-        ? { ok: false, text: slugError }
-        : slugAvailability?.slug === slug
-          ? slugAvailability.note
-          : null;
 
   useEffect(() => {
-    if (!addressesOn || !slug || validateSlug(slug)) return;
+    if (!slugTouched) setSlug(slugify(shopName));
+  }, [shopName, slugTouched]);
+
+  useEffect(() => {
+    if (!addressesOn || !slug) {
+      setSlugNote(null);
+      return;
+    }
+    const bad = validateSlug(slug);
+    if (bad) {
+      setSlugNote({ ok: false, text: bad });
+      return;
+    }
     const t = setTimeout(async () => {
       try {
         const r = await fetch(`/api/shop/slug-check?slug=${encodeURIComponent(slug)}`);
         const d = await r.json();
-        setSlugAvailability({
-          slug,
-          note: d.available ? { ok: true, text: "Available ✓" } : { ok: false, text: d.reason || "Not available" },
-        });
+        setSlugNote(d.available ? { ok: true, text: "Available ✓" } : { ok: false, text: d.reason || "Not available" });
       } catch {
-        setSlugAvailability(null);
+        setSlugNote(null);
       }
     }, 400);
     return () => clearTimeout(t);
@@ -121,6 +121,12 @@ export default function SignupPage() {
 
   return (
     <div className="flex min-h-screen flex-1" style={{ fontFamily: LEX_FONT, background: PAGE_BG }}>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap"
+        precedence="default"
+      />
+
       {/* Brand panel */}
       <div
         className="relative hidden flex-1 flex-col justify-between overflow-hidden p-12 text-white lg:flex"
@@ -255,7 +261,8 @@ export default function SignupPage() {
                       required
                       value={slug}
                       onChange={(v) => {
-                        setSlugOverride(v.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+                        setSlugTouched(true);
+                        setSlug(v.toLowerCase().replace(/[^a-z0-9-]/g, ""));
                       }}
                       helper={slug ? shopUrlForSlug(slug).replace(/^https?:\/\//, "") : "Your customers will use this address"}
                     />

@@ -103,6 +103,30 @@ export function welcomeEmail(p: { name: string; shopName: string; shopUrl: strin
   return { subject, text, html };
 }
 
+/** Sent to the owner whenever the shop's Razorpay keys are added, changed or removed, so a hijacked login is noticed. */
+export function razorpayChangedEmail(p: { name: string; shopName: string; action: "added" | "changed" | "removed"; keyId?: string; when: string }) {
+  const { name, shopName, action, keyId, when } = p;
+  const what = action === "removed" ? "were removed" : `were ${action}`;
+  const subject = `Security: Razorpay keys ${what} for ${shopName}`;
+  const text = [
+    `Hi ${name},`,
+    ``,
+    `The Razorpay payment keys for "${shopName}" ${what} on ${when}.`,
+    keyId ? `Key ID: ${keyId}` : ``,
+    ``,
+    `If this was you, no action is needed.`,
+    `If it was not you, change your password right away (Settings -> Change password) and generate new keys in your Razorpay dashboard.`,
+  ].join("\n");
+  const html = `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#0f172a;line-height:1.55">
+<h2 style="margin:0 0 12px">Razorpay keys ${esc(what)}</h2>
+<p>Hi ${esc(name)}, the Razorpay payment keys for <b>${esc(shopName)}</b> ${esc(what)} on ${esc(when)}.</p>
+${keyId ? `<p style="color:#475569">Key ID: <code>${esc(keyId)}</code></p>` : ""}
+<p>If this was you, no action is needed.</p>
+<p style="color:#b91c1c"><b>If it was not you</b>, change your password right away (Settings &rarr; Change password) and generate new keys in your Razorpay dashboard.</p>
+</div>`;
+  return { subject, text, html };
+}
+
 /** The 6-digit code that proves a new owner controls the email address they signed up with. */
 export function otpEmail(p: { name: string; code: string; minutes: number }) {
   const { name, code, minutes } = p;
