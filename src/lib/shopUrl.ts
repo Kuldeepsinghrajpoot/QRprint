@@ -10,7 +10,7 @@ const TEMPLATE = process.env.NEXT_PUBLIC_SHOP_URL_TEMPLATE || "";
 
 export const RESERVED_SLUGS = new Set([
   "www", "app", "qr", "admin", "api", "mail", "support", "help", "login", "signup", "static", "assets",
-  "dashboard", "main", "track", "terms", "privacy-policy", "photo-tools", "privacy", "pricing", "about", "contact", "status", "blog", "docs", "billing", "ftp", "smtp", "test", "demo",
+  "dashboard", "main", "track", "terms", "privacy-policy", "photo-tools", "privacy", "pricing", "refund-policy", "refund", "cancellation", "services", "policies", "about", "contact", "status", "blog", "docs", "billing", "ftp", "smtp", "test", "demo",
 ]);
 
 export const shopUrlForSlug = (slug: string): string => (TEMPLATE ? TEMPLATE.replace("{slug}", slug) : "");

@@ -1,33 +1,16 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import { connectDB } from "@/lib/mongodb";
-import { Shop } from "@/models/Shop";
-import { decryptSecret } from "@/lib/secretBox";
 
 /** The Razorpay account used for one payment: the shop's own keys, or (if it has none) the platform keys from env. */
 export type RzpCreds = { keyId: string; keySecret: string; source: "shop" | "platform" };
 
-const platformCreds = (): RzpCreds | null =>
+/** The platform-level Razorpay account from env, used by shops that have not added any gateway keys of their own. */
+export const platformRazorpayCreds = (): RzpCreds | null =>
   process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET
     ? { keyId: process.env.RAZORPAY_KEY_ID, keySecret: process.env.RAZORPAY_KEY_SECRET, source: "platform" }
     : null;
 
-/** Looks up which Razorpay keys to use for a shop. null = online payments are not set up. */
-export async function getRazorpayCreds(shopId: string | null | undefined): Promise<RzpCreds | null> {
-  if (shopId) {
-    await connectDB();
-    const shop = await Shop.findOne({ shopId }).select("razorpayKeyId razorpaySecretEnc").lean();
-    if (shop?.razorpayKeyId && shop?.razorpaySecretEnc) {
-      const secret = decryptSecret(shop.razorpaySecretEnc);
-      if (secret) return { keyId: shop.razorpayKeyId, keySecret: secret, source: "shop" };
-      // The shop set up its own keys but they cannot be read (encryption key changed / missing). Do NOT quietly
-      // switch to the platform account: that would send this shop's customers' money to the wrong place.
-      console.error(`[razorpay] shop ${shopId}: saved keys cannot be decrypted - online payment disabled for this shop`);
-      return null;
-    }
-  }
-  return platformCreds();
-}
+// Which gateway a shop uses, and which keys belong to it, is decided in src/lib/payments/index.ts.
 
 export const clientFor = (c: RzpCreds) => new Razorpay({ key_id: c.keyId, key_secret: c.keySecret });
 

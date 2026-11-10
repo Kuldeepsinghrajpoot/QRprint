@@ -19,5 +19,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     page("/photo-tools", 0.5, "monthly"),
     page("/terms", 0.3, "yearly"),
     page("/privacy-policy", 0.3, "yearly"),
+    page("/refund-policy", 0.3, "yearly"),
+    page("/pricing", 0.5, "monthly"),
   ];
 }

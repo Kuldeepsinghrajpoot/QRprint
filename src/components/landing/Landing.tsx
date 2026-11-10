@@ -4,7 +4,9 @@ import {
   Tag, QrCode, BarChart3, Languages, Trash2, MessageCircle, Mail, MapPin, Gift,
 } from "./Icon";
 import Image from "next/image";
-import { SITE } from "./site";
+import Link from "next/link";
+import { SITE, PLANS } from "./site";
+import { LEGAL_LINKS } from "./LegalLinks";
 import { publicSans } from "./fonts";
 import LoginModal from "./LoginModal";
 import MobileMenu from "./MobileMenu";
@@ -45,11 +47,8 @@ const who = [
   { i: GraduationCap, t: "Colleges and libraries", d: "Self-service printing for notes and assignments." },
 ];
 
-// Placeholder pricing: edit freely.
-const plans = [
-  { n: "Starter", p: "49", per: "per month", o: "500 print orders", cta: "Get Starter free" },
-  { n: "Unlimited", p: "99", per: "per month", o: "Unlimited print orders", cta: "Get Unlimited free", hot: true },
-];
+// Plans live in site.ts so /pricing shows the same numbers.
+const plans = PLANS;
 
 const faqs = [
   ["Do customers need to install an app?", "No. The upload page opens in the phone browser after scanning your QR."],
@@ -229,6 +228,7 @@ export default function Landing() {
           <div className="mx-auto max-w-6xl px-5">
             <h2 className="font-display text-4xl font-extrabold">Everything is free for a limited period.</h2>
             <p className="mt-3 max-w-xl text-paper/70">Every feature is included in both plans, at no cost for now. No hidden charges, no auto-renewal.</p>
+            <p className="mt-3 text-sm text-paper/70"><Link href="/pricing" className="font-semibold underline hover:text-sun">Full pricing and service details</Link> · <Link href="/refund-policy" className="font-semibold underline hover:text-sun">Refund and cancellation</Link></p>
             <div className="mt-10 grid max-w-3xl gap-5 md:grid-cols-2">
               {plans.map((p) => (
                 <div key={p.n} className={`flex flex-col rounded-md p-6 ${p.hot ? "bg-sun text-ink" : "bg-white/8 ring-1 ring-white/15"}`}>
@@ -236,7 +236,7 @@ export default function Landing() {
                   <p className="mt-4 flex items-baseline gap-3"><span className="font-display text-5xl font-extrabold">₹0</span><s className="text-xl opacity-60">₹{p.p}</s></p>
                   <p className="text-sm opacity-70">Free for a limited period. Regular price ₹{p.p} {p.per}.</p>
                   <p className="mt-5 flex flex-1 items-start gap-2 font-semibold"><Check size={20} className="mt-0.5 shrink-0" />{p.o}</p>
-                  <a href={`/signup?plan=${p.n.toLowerCase().replace(" ", "-")}`} className={`mt-6 rounded-md py-3 text-center font-semibold ${p.hot ? "bg-ink text-white" : "bg-white text-ink"}`}>{p.cta}</a>
+                  <Link href={`/signup?plan=${p.n.toLowerCase().replace(" ", "-")}`} className={`mt-6 rounded-md py-3 text-center font-semibold ${p.hot ? "bg-ink text-white" : "bg-white text-ink"}`}>{p.cta}</Link>
                 </div>
               ))}
             </div>
@@ -259,7 +259,7 @@ export default function Landing() {
           <div className="rounded-md bg-brand px-8 py-14 text-center text-white">
             <h2 className="mx-auto max-w-2xl font-display text-4xl font-extrabold">Set up in about 10 minutes. Free for a limited period.</h2>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <a href="/signup" className="rounded-md bg-sun px-7 py-3 font-semibold text-ink">Start free</a>
+              <Link href="/signup" className="rounded-md bg-sun px-7 py-3 font-semibold text-ink">Start free</Link>
               <a href={wa} className="rounded-md border-2 border-white/40 px-7 py-3 font-semibold">Talk on WhatsApp</a>
             </div>
           </div>
@@ -289,11 +289,10 @@ export default function Landing() {
         </div>
         <div className="border-t border-ink/10 py-5 text-center text-sm text-ink/60">
           <nav className="mb-2 flex flex-wrap justify-center gap-x-5 gap-y-1 font-medium">
-            <a href="/print-agent" className="hover:text-brand">Print Agent</a>
-            <a href="/terms" className="hover:text-brand">Terms</a>
-            <a href="/privacy-policy" className="hover:text-brand">Privacy Policy</a>
-            <a href="/login" className="hover:text-brand">Login</a>
-            <a href="/signup" className="hover:text-brand">Sign up</a>
+            <Link href="/print-agent" className="hover:text-brand">Print Agent</Link>
+            {LEGAL_LINKS.map((l) => <Link key={l.href} href={l.href} className="hover:text-brand">{l.label}</Link>)}
+            <Link href="/login" className="hover:text-brand">Login</Link>
+            <Link href="/signup" className="hover:text-brand">Sign up</Link>
           </nav>
           © {new Date().getFullYear()} {SITE.name}. Powered by{" "}
           <a href={SITE.poweredBy.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand hover:underline">{SITE.poweredBy.name}</a>

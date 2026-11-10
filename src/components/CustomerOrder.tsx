@@ -5,24 +5,22 @@ import { shopOpenStatus } from "@/lib/shopHours";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { slugFromHostname } from "@/lib/shopUrl";
 import Link from "next/link";
-import Script from "next/script";
+import PdfPreviewDialog from "@/components/PdfPreviewDialog";
+import { extractPages } from "@/lib/pdfRange";
+import { describePages } from "@/lib/pageRange";
 import { detectPageCount, isAutoDetectable, isWordDoc, isZipFile } from "@/lib/pdf";
 import { enhanceScan } from "@/lib/photoTools";
-import { calcOrderPrice, PAGES_PER_SHEET_OPTIONS, PrintType, PaperSize, BindingType, DuplexEdge } from "@/lib/pricing";
+import { calcOrderPrice, calcOnlineFee, isOffered, offeredSizes, offeredTypes, nearestOffered, PAGES_PER_SHEET_OPTIONS, PrintType, PaperSize, BindingType, DuplexEdge } from "@/lib/pricing";
 import PrinterMachine from "@/components/PrinterMachine";
 import type { OrderDTO, PricingConfigDTO } from "@/types/order";
-import PoweredBy from "@/components/PoweredBy";
+import ShopFooter from "@/components/ShopFooter";
+import { runOnlinePayment } from "@/lib/payments/client";
+import type { PaymentIntent, PaymentProof } from "@/lib/payments/types";
 
 type Step = "upload" | "payment" | "processing" | "receipt";
 type PaymentMethod = "cash" | "online" | "free";
 
 const CANCEL_WINDOW_SECONDS = 30;
-
-declare global {
-  interface Window {
-    Razorpay: new (options: Record<string, unknown>) => { open: () => void };
-  }
-}
 
 export default function CustomerPage() {
   const [step, setStep] = useState<Step>("upload");
@@ -45,6 +43,11 @@ export default function CustomerPage() {
   const [priority, setPriority] = useState(false);
   const [copies, setCopies] = useState(1);
   const [detecting, setDetecting] = useState(false);
+  // PDF preview popup and the page range the customer chose in it (null = every page)
+  const [showPreview, setShowPreview] = useState(false);
+  const [pageRange, setPageRange] = useState("");
+  const [selectedPages, setSelectedPages] = useState<number[] | null>(null);
+  const [pdfTotal, setPdfTotal] = useState(0);
 
   const [pickedMethod, setMethod] = useState<PaymentMethod | null>(null);
   const [processingText, setProcessingText] = useState("Processing payment");
@@ -62,6 +65,9 @@ export default function CustomerPage() {
   // Which shop this customer scanned: the QR link carries ?shop=<id>. Remembered for the session so it
   // survives a trip to /photo-tools and back.
   const shopRef = useRef<string>("");
+  // Where this shop's policy pages live: "" on its own sub-address (/terms is that shop's), "/<shop>" on the main address.
+  const [policyBase, setPolicyBase] = useState("");
+  const [shopKey, setShopKey] = useState(""); // the shop's slug or id, for the footer's business details
   const [queue, setQueue] = useState<{ ahead: number; minutes: number } | null>(null);
   useEffect(() => {
     // On a shop sub-address the shop is the first part of the host name; old QR links use ?shop=<id>.
@@ -75,6 +81,9 @@ export default function CustomerPage() {
       /* storage blocked — the query string still works for this page view */
     }
     shopRef.current = shop;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the address is only known in the browser
+    setPolicyBase(slugFromHostname(window.location.hostname) || !shop ? "" : `/${encodeURIComponent(shop)}`);
+    setShopKey(shop);
     fetch(`/api/settings/pricing${shop ? `?shop=${encodeURIComponent(shop)}` : ""}`)
       .then(async (r) => {
         const data = await r.json();
@@ -219,6 +228,23 @@ export default function CustomerPage() {
   // The customer's choice, or the only method the shop accepts (nothing to choose between).
   const method: PaymentMethod | null = free ? "free" : (pickedMethod ?? onlyMethod);
   const noPayment = !!config && !free && !config.cashPaymentEnabled && !config.onlinePaymentEnabled;
+  // Online payments add the gateway's charge (+ GST on it) when the shop passes it on; cash and free orders never pay it.
+  const onlineFee = config && price ? calcOnlineFee(price.total, !free && method === "online" && config.onlineFeeEnabled === true, config.onlineFeePercent ?? 2, config.onlineFeeGstPercent ?? 18) : { fee: 0, gst: 0, total: 0 };
+  const payTotal = (price?.total ?? 0) + onlineFee.total;
+  // Only what the shop can print is offered. If the current choice is not on the list (e.g. the Photo tool picked colour
+  // Photo but the shop has no photo printing), move to the nearest option that is.
+  const nothingOffered = !!config && !free && offeredTypes(config.availability).length === 0;
+  const typesOffered = config ? offeredTypes(config.availability) : [];
+  const sizesOffered = config ? offeredSizes(config.availability, printType) : [];
+  useEffect(() => {
+    if (!config || isOffered(config.availability, paperSize, printType)) return;
+    const next = nearestOffered(config.availability, paperSize, printType);
+    if (next) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- snap the choice to something the shop offers
+      setPaperSize(next.paperSize);
+      setPrintType(next.printType);
+    }
+  }, [config, paperSize, printType]);
   const phoneOk = /^\+?[0-9][0-9 -]{6,18}$/.test(phone.trim());
   const ruleMessage = !config || !file || pages <= 0
     ? ""
@@ -229,10 +255,12 @@ export default function CustomerPage() {
         : !free && config.minOrderAmount && price && price.total < config.minOrderAmount
           ? `The minimum order is ₹${config.minOrderAmount}.`
           : "";
-  const canContinue = name.trim().length > 0 && !!file && pages > 0 && !detecting && !!config && hours.open && !noPayment && !ruleMessage;
+  const canContinue = name.trim().length > 0 && !!file && pages > 0 && !detecting && !!config && hours.open && !noPayment && !nothingOffered && !ruleMessage;
   const showDuplexTip = pages > 4 && !duplex && paperSize === "A4";
 
   async function loadFile(f: File) {
+    setSelectedPages(null);
+    setPageRange("");
     setFile(f);
     setError(null);
     if (isAutoDetectable(f)) {
@@ -241,6 +269,9 @@ export default function CustomerPage() {
       try {
         const count = await detectPageCount(f);
         setPages(count);
+        setPdfTotal(count);
+        // A PDF opens the preview popup straight away, where the customer can type a page range.
+        if (f.type === "application/pdf") setShowPreview(true);
       } finally {
         setDetecting(false);
       }
@@ -311,13 +342,11 @@ export default function CustomerPage() {
     }
   }
 
-  async function submitOrder(razorpayFields?: {
-    razorpayOrderId: string;
-    razorpayPaymentId: string;
-    razorpaySignature: string;
-  }) {
+  async function submitOrder(paymentProof?: PaymentProof) {
     setProcessingText(method === "cash" || method === "free" ? "Confirming order" : "Uploading file");
-    const uploadData = await uploadSelectedFile(file!);
+    // With a page range chosen, only those pages are uploaded: the shop prints exactly what was priced.
+    const toUpload = selectedPages && file!.type === "application/pdf" ? await extractPages(file!, selectedPages) : file!;
+    const uploadData = await uploadSelectedFile(toUpload);
 
     setProcessingText(method === "cash" || method === "free" ? "Generating token" : "Verifying payment");
     const orderRes = await fetch("/api/orders", {
@@ -341,7 +370,7 @@ export default function CustomerPage() {
         copies,
         priority,
         paymentMethod: method,
-        ...razorpayFields,
+        ...paymentProof,
       }),
     });
     const orderData = await orderRes.json();
@@ -364,48 +393,30 @@ export default function CustomerPage() {
     try {
       if (method === "online") {
         setProcessingText("Starting payment");
-        const createRes = await fetch("/api/payments/razorpay/create", {
+        const createRes = await fetch("/api/payments/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: price.total, receipt: `qrp_${Date.now()}`, shop: shopRef.current || undefined }),
+          body: JSON.stringify({ amount: payTotal, receipt: `qrp_${Date.now()}`, shop: shopRef.current || undefined }),
         });
         const createData = await createRes.json();
 
         if (createRes.ok && createData.configured) {
-          await new Promise<void>((resolve, reject) => {
-            const rzp = new window.Razorpay({
-              key: createData.keyId,
-              amount: createData.amount,
-              currency: createData.currency,
-              order_id: createData.razorpayOrderId,
-              name: config?.shopName || "QRtoPrint",
-              description: `Print order — ${pages} pages x ${copies}`,
-              prefill: { name, contact: phone || undefined },
-              theme: { color: "#2563eb" },
-              handler: async (response: {
-                razorpay_order_id: string;
-                razorpay_payment_id: string;
-                razorpay_signature: string;
-              }) => {
-                try {
-                  await submitOrder({
-                    razorpayOrderId: response.razorpay_order_id,
-                    razorpayPaymentId: response.razorpay_payment_id,
-                    razorpaySignature: response.razorpay_signature,
-                  });
-                  resolve();
-                } catch (err) {
-                  reject(err);
-                }
-              },
-              modal: { ondismiss: () => reject(new Error("Payment cancelled")) },
-            });
-            rzp.open();
+          // The shop's active gateway (Razorpay, PhonePe or Paytm) decides which payment window opens.
+          const proof = await runOnlinePayment(createData as PaymentIntent & { configured: true }, {
+            shopName: config?.shopName || "QRtoPrint",
+            description: `Print order — ${pages} pages x ${copies}`,
+            name,
+            phone: phone || undefined,
           });
-        } else {
+          await submitOrder(proof);
+        } else if (createRes.status === 501) {
+          // No payment account is set up at all: simulated test-mode payment (the server refuses this in production).
           setProcessingText("Verifying UPI (test mode)");
           await new Promise((r) => setTimeout(r, 900));
           await submitOrder();
+        } else {
+          // Shop closed, too busy, gateway refused... show the real reason instead of pretending to pay.
+          throw new Error(typeof createData.error === "string" ? createData.error : "Could not start the payment. Please try again.");
         }
       } else {
         await submitOrder();
@@ -423,6 +434,9 @@ export default function CustomerPage() {
     setName("");
     setPhone("");
     setFile(null);
+    setSelectedPages(null);
+    setPageRange("");
+    setShowPreview(false);
     setPages(0);
     setPageCountEstimated(false);
     setPrintType("bw");
@@ -443,13 +457,6 @@ export default function CustomerPage() {
       className="flex-1 flex justify-center px-3 sm:px-4 py-5 sm:py-8"
       style={{ fontFamily: LEX_FONT, background: PAGE_BG }}
     >
-      {/* Public Sans — same font as the shop dashboard (React 19 hoists this into <head>) */}
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap"
-        precedence="default"
-      />
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       <div className="w-full max-w-md md:max-w-lg">
         <header className="mb-5 flex items-center gap-3 px-1">
           <span
@@ -567,10 +574,34 @@ export default function CustomerPage() {
                   file={file}
                   previewUrl={previewUrl}
                   detecting={detecting}
+                  pageNote={selectedPages ? `Printing pages ${describePages(selectedPages)} (${selectedPages.length} of ${pdfTotal})` : ""}
+                  onChoosePages={() => setShowPreview(true)}
                   onRemove={() => {
                     setFile(null);
+                    setSelectedPages(null);
+                    setPageRange("");
                     setPages(0);
                     setPageCountEstimated(false);
+                  }}
+                />
+              )}
+
+              {showPreview && file && file.type === "application/pdf" && (
+                <PdfPreviewDialog
+                  file={file}
+                  initialRange={pageRange}
+                  onClose={() => setShowPreview(false)}
+                  onApply={(chosen, text, total) => {
+                    setShowPreview(false);
+                    if (!text || chosen.length === 0 || (total > 0 && chosen.length === total)) {
+                      setSelectedPages(null);
+                      setPageRange("");
+                      if (total > 0) setPages(total);
+                    } else {
+                      setSelectedPages(chosen);
+                      setPageRange(text);
+                      setPages(chosen.length);
+                    }
                   }}
                 />
               )}
@@ -594,16 +625,17 @@ export default function CustomerPage() {
               <div className="space-y-5 border-t border-slate-100 pt-6">
                 <Field label="Print type">
                   <div className="grid grid-cols-2 gap-2">
-                    <TypeTile active={printType === "bw"} onClick={() => setPrintType("bw")} title="B&W" dots={["#0f172a", "#94a3b8"]} />
-                    <TypeTile active={printType === "color"} onClick={() => setPrintType("color")} title="Colour" dots={["#ef4444", "#eab308", "#3b82f6"]} />
+                    {(!config || typesOffered.includes("bw")) && <TypeTile active={printType === "bw"} onClick={() => setPrintType("bw")} title="B&W" dots={["#0f172a", "#94a3b8"]} />}
+                    {(!config || typesOffered.includes("color")) && <TypeTile active={printType === "color"} onClick={() => setPrintType("color")} title="Colour" dots={["#ef4444", "#eab308", "#3b82f6"]} />}
                   </div>
+                  {nothingOffered && <p className="mt-2 text-[13px] font-medium text-amber-700">This shop isn&apos;t taking print orders right now.</p>}
                 </Field>
 
                 <Field label="Paper size">
                   <Segmented
                     value={paperSize}
                     onChange={setPaperSize}
-                    options={(["A4", "A3", "Legal", "Letter", "Photo"] as PaperSize[]).map((s) => ({ value: s, label: s }))}
+                    options={(config ? sizesOffered : (["A4", "A3", "Legal", "Letter", "Photo"] as PaperSize[])).map((s) => ({ value: s, label: s }))}
                   />
                 </Field>
 
@@ -729,8 +761,21 @@ export default function CustomerPage() {
               </div>
               <div className="bg-slate-50 border border-dashed border-slate-300 rounded-[10px] px-4 py-3.5 flex justify-between text-[15px] font-bold text-slate-900/90 tabular-nums">
                 <span>Amount to pay</span>
-                <span>₹{price.total}</span>
+                <span>₹{payTotal}</span>
               </div>
+              {onlineFee.total > 0 && (
+                <div className="-mt-2 rounded-[10px] border border-slate-200 px-4 py-2.5 text-[12.5px] text-slate-900/70 tabular-nums">
+                  <Row label="Order total" value={`₹${price.total}`} />
+                  <Row label={`Online payment fee (${config.onlineFeePercent ?? 2}%)`} value={`+ ₹${onlineFee.fee}`} />
+                  {onlineFee.gst > 0 && <Row label={`GST on fee (${config.onlineFeeGstPercent ?? 18}%)`} value={`+ ₹${onlineFee.gst}`} />}
+                  <p className="mt-1 text-[11.5px] text-slate-900/50">Pay by cash to avoid this fee.</p>
+                </div>
+              )}
+              <p className="text-center text-xs text-slate-900/50">
+                By paying you agree to the{" "}
+                <a href={`${policyBase}/terms`} target="_blank" rel="noopener noreferrer" className="underline">Terms</a> and the{" "}
+                <a href={`${policyBase}/refund-policy`} target="_blank" rel="noopener noreferrer" className="underline">Refund &amp; Cancellation Policy</a>.
+              </p>
               <button disabled={!method || submitting || config.printingPaused || noPayment} onClick={handlePay} className="btn-primary">
                 Pay Now
               </button>
@@ -742,7 +787,7 @@ export default function CustomerPage() {
 
           {step === "processing" && price && (
             <div className="text-center py-4">
-              <PrinterMachine amountLabel={`₹${price.total}`} />
+              <PrinterMachine amountLabel={`₹${payTotal}`} />
               <div className="text-[14.5px] font-bold text-[color:var(--accent)] mt-1 min-h-[20px]">
                 {processingText}
                 <span className="dot-anim inline-flex ml-0.5">
@@ -826,7 +871,7 @@ export default function CustomerPage() {
             </div>
           )}
         </div>
-        <PoweredBy className="mt-5" />
+        <ShopFooter shop={shopKey} base={policyBase} />
       </div>
     </div>
   );
@@ -984,11 +1029,15 @@ function FilePreview({
   file,
   previewUrl,
   detecting,
+  pageNote,
+  onChoosePages,
   onRemove,
 }: {
   file: File;
   previewUrl: string | null;
   detecting: boolean;
+  pageNote: string;
+  onChoosePages: () => void;
   onRemove: () => void;
 }) {
   const isPdf = file.type === "application/pdf";
@@ -1004,8 +1053,12 @@ function FilePreview({
         </button>
       </div>
 
-      {isPdf && previewUrl && (
-        <embed src={previewUrl} type="application/pdf" className="w-full h-56 sm:h-64" />
+      {isPdf && (
+        // The popup (Preview / choose pages) shows the pages; here just a summary, so a chosen page range is never contradicted by a full-file viewer.
+        <div className="flex items-center gap-3 px-4 py-4">
+          <div className="text-3xl">📄</div>
+          <div className="text-[12px] text-slate-600">PDF · {sizeLabel}. Tap <b>Preview / choose pages</b> to check the pages or print only some of them.</div>
+        </div>
       )}
       {isImage && previewUrl && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -1020,8 +1073,13 @@ function FilePreview({
         </div>
       )}
 
-      <div className="px-3 py-2 text-[11.5px] text-slate-500 bg-white">
-        {detecting ? "Counting pages…" : "Ready to print"}
+      <div className="flex items-center justify-between gap-3 bg-white px-3 py-2 text-[11.5px] text-slate-500">
+        <span>{detecting ? "Counting pages…" : pageNote || "Ready to print"}</span>
+        {isPdf && !detecting && (
+          <button type="button" onClick={onChoosePages} className="shrink-0 font-bold text-[color:var(--accent)] underline">
+            Preview / choose pages
+          </button>
+        )}
       </div>
     </div>
   );

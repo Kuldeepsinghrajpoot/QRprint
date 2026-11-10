@@ -35,6 +35,8 @@ export interface OrderDTO {
   priorityFee: number;
   gstRate: number;
   gstAmount: number;
+  onlineFee?: number;
+  onlineFeeGst?: number;
   totalPrice: number;
 
   paymentMethod: PaymentMethod;
@@ -60,12 +62,16 @@ export interface PricingConfigDTO {
   shopId: string;
   shopName: string;
   rates: Record<PaperSize, Record<PrintType, TierRate>>;
+  availability?: Partial<Record<PaperSize, Partial<Record<PrintType, boolean>>>>;
   duplexDiscountPercent: number;
   bindingSpiralCharge: number;
   bindingLaminationCharge: number;
   priorityFeePercent: number;
   gstEnabled: boolean;
   gstPercent: number;
+  onlineFeeEnabled?: boolean;
+  onlineFeePercent?: number;
+  onlineFeeGstPercent?: number;
   freePrinting?: boolean;
   cashPaymentEnabled: boolean;
   onlinePaymentEnabled: boolean;

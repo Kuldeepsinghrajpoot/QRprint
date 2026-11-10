@@ -110,6 +110,56 @@ export function calcOrderPrice(input: PriceBreakdownInput): PriceBreakdown {
   return { sides, sheets, baseCost, duplexDiscount, bindingCharge, subtotal, priorityFee, gstAmount, total };
 }
 
+export const PAPER_SIZES: readonly PaperSize[] = ["A4", "A3", "Legal", "Letter", "Photo"];
+export const PRINT_TYPES: readonly PrintType[] = ["bw", "color"];
+
+/** Which paper size + print type combinations a shop can print. A missing entry counts as offered (shops from before this setting). */
+export type Availability = Partial<Record<PaperSize, Partial<Record<PrintType, boolean>>>>;
+
+export const isOffered = (a: Availability | null | undefined, size: PaperSize, type: PrintType): boolean => a?.[size]?.[type] !== false;
+
+/** Print types the shop offers on at least one paper size. */
+export const offeredTypes = (a: Availability | null | undefined): PrintType[] => PRINT_TYPES.filter((t) => PAPER_SIZES.some((s) => isOffered(a, s, t)));
+
+/** Paper sizes the shop can print in the given type. */
+export const offeredSizes = (a: Availability | null | undefined, type: PrintType): PaperSize[] => PAPER_SIZES.filter((s) => isOffered(a, s, type));
+
+/**
+ * The nearest combination the shop really offers: keeps the wanted type and size when possible, otherwise keeps the type and
+ * takes its first size, otherwise takes the first offered type. null when the shop offers nothing.
+ */
+export function nearestOffered(a: Availability | null | undefined, size: PaperSize, type: PrintType): { paperSize: PaperSize; printType: PrintType } | null {
+  if (isOffered(a, size, type)) return { paperSize: size, printType: type };
+  const sameType = offeredSizes(a, type);
+  if (sameType.length) return { paperSize: sameType.includes("A4") ? "A4" : sameType[0], printType: type };
+  const other = offeredTypes(a)[0];
+  if (!other) return null;
+  const sizes = offeredSizes(a, other);
+  return { paperSize: sizes.includes(size) ? size : sizes.includes("A4") ? "A4" : sizes[0], printType: other };
+}
+
+/** Default online payment charge (Razorpay: 2% per transaction + 18% GST on that fee). */
+export const DEFAULT_ONLINE_FEE_PERCENT = 2;
+export const DEFAULT_ONLINE_FEE_GST_PERCENT = 18;
+
+export interface OnlineFee {
+  fee: number; // gateway charge passed on to the customer, e.g. 2% of the order total
+  gst: number; // GST charged on that fee, e.g. 18% of `fee`
+  total: number; // fee + gst
+}
+
+/**
+ * Online payment charge added on top of the order total when the customer pays by UPI/card.
+ * Example: Rs 100 order, 2% + 18% GST -> fee 2, GST 0.36 -> rounds to 0, so Rs 2 extra; Rs 500 -> fee 10 + GST 2 = Rs 12.
+ * Returns zeros when the shop has not turned it on, so callers can add `.total` unconditionally.
+ */
+export function calcOnlineFee(orderTotal: number, enabled: boolean, feePercent: number, gstPercent: number): OnlineFee {
+  if (!enabled || orderTotal <= 0 || feePercent <= 0) return { fee: 0, gst: 0, total: 0 };
+  const fee = Math.round((orderTotal * feePercent) / 100);
+  const gst = Math.round((fee * Math.max(0, gstPercent)) / 100);
+  return { fee, gst, total: fee + gst };
+}
+
 /** Generates a short, human-friendly order token, e.g. "A247" */
 export function generateToken(): string {
   const letter = String.fromCharCode(65 + Math.floor(Math.random() * 26));

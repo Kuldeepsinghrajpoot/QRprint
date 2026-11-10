@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
 import { purgeOrderFile } from "@/lib/fileCleanup";
-import { getRazorpayCreds, refundRazorpayPayment } from "@/lib/razorpay";
+import { refundOnlinePayment } from "@/lib/payments";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { CANCEL_WINDOW_MS } from "@/lib/orderTiming";
 import { cancelKeyMatches } from "@/lib/cancelKey";
@@ -17,7 +17,7 @@ export const runtime = "nodejs";
  * Lets a customer cancel their own order (e.g. wrong file selected) within
  * a short window right after placing it. Only allowed while the order is
  * still "queued" — once it starts printing, it's too late to pull back.
- * If it was paid online, a refund is attempted automatically via Razorpay.
+ * If it was paid online, a refund is attempted automatically through the gateway that took the payment (Razorpay, PhonePe or Paytm).
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { ok } = rateLimit(`cancel-order:${getClientIp(req)}`, 20, 5 * 60 * 1000);
@@ -70,13 +70,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     let refundIssued = false;
-    const rzpCreds = order.paymentMethod === "online" ? await getRazorpayCreds(order.shopId) : null;
-    if (order.paymentMethod === "online" && order.paymentStatus === "paid" && order.razorpayPaymentId && rzpCreds) {
+    if (order.paymentMethod === "online" && order.paymentStatus === "paid") {
       try {
-        await refundRazorpayPayment(rzpCreds, order.razorpayPaymentId);
-        refundIssued = true;
-        cancelled.paymentStatus = "refunded";
-        await cancelled.save();
+        if ((await refundOnlinePayment(order)) === "refunded") {
+          refundIssued = true;
+          cancelled.paymentStatus = "refunded";
+          await cancelled.save();
+        }
       } catch (err) {
         // Don't undo the cancellation on a refund hiccup — the order still
         // shouldn't print. Surface this so the shop can follow up manually.

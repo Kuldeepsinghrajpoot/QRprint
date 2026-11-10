@@ -7,9 +7,10 @@ import { connectDB } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
 import { PricingConfig, DEFAULT_RATES } from "@/models/PricingConfig";
 import { Customer, pointsForAmount } from "@/models/Customer";
-import { calcOrderPrice, generateToken } from "@/lib/pricing";
+import { calcOrderPrice, calcOnlineFee, generateToken, isOffered } from "@/lib/pricing";
 import { sendOrderNotification, orderPlacedMessage } from "@/lib/notify";
-import { getRazorpayCreds, verifyRazorpaySignature, fetchRazorpayOrder } from "@/lib/razorpay";
+import { getGateway, verifyPayment, type PaidFields } from "@/lib/payments";
+import { isProvider } from "@/lib/payments/types";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { getSession } from "@/lib/session";
 import { publicUrlForKey } from "@/lib/storage";
@@ -37,10 +38,13 @@ const createOrderSchema = z.object({
   copies: z.number().int().min(1).max(50),
   priority: z.boolean().default(false),
   paymentMethod: z.enum(["cash", "online", "free"]),
-  // Present only for real Razorpay payments (omitted in simulated/test-mode flow)
-  razorpayOrderId: z.string().optional(),
-  razorpayPaymentId: z.string().optional(),
-  razorpaySignature: z.string().optional(),
+  // Present only for real online payments (omitted in simulated/test-mode flow).
+  // Razorpay sends its three fields; PhonePe and Paytm send the gatewayOrderId the server gave them. The server re-checks all of it with the gateway.
+  paymentProvider: z.enum(["razorpay", "phonepe", "paytm"]).optional(),
+  razorpayOrderId: z.string().max(100).optional(),
+  razorpayPaymentId: z.string().max(100).optional(),
+  razorpaySignature: z.string().max(200).optional(),
+  gatewayOrderId: z.string().max(80).optional(),
   // Which shop the customer scanned (from the QR link ?shop=...). Missing = the original single shop.
   shop: z.string().trim().max(40).optional(),
 });
@@ -164,6 +168,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Online payment is currently disabled by the shop" }, { status: 400 });
     }
 
+    if (!isOffered(config.availability, data.paperSize, data.printType)) {
+      return NextResponse.json({ error: `This shop doesn't offer ${data.printType === "bw" ? "black & white" : "colour"} printing on ${data.paperSize} paper` }, { status: 400 });
+    }
+
     const price = calcOrderPrice({
       rates: config.rates,
       paperSize: data.paperSize,
@@ -182,48 +190,44 @@ export async function POST(req: NextRequest) {
       gstPercent: config.gstPercent,
     });
 
+    // Online payments carry the gateway's charge (and GST on it); cash orders never do. The minimum order check
+    // above/below uses the bill without it, so the charge cannot be what makes an order reach the minimum.
+    const onlineFee = calcOnlineFee(price.total, !free && paymentMethod === "online" && config.onlineFeeEnabled === true, config.onlineFeePercent ?? 2, config.onlineFeeGstPercent ?? 18);
+    const chargeTotal = price.total + onlineFee.total;
+
     if (!free && config.minOrderAmount > 0 && price.total < config.minOrderAmount) {
       return NextResponse.json({ error: `The minimum order is ₹${config.minOrderAmount}` }, { status: 400 });
     }
 
     // Determine payment status:
     // - Cash: always starts "pending" (confirmed later at the counter)
-    // - Online + Razorpay configured: MUST include a valid signature to be marked "paid"
-    // - Online + Razorpay NOT configured: simulated test-mode flow, marked "paid" immediately
+    // - Online + a gateway set up: the gateway itself must confirm the payment (right amount, not used before) to be marked "paid"
+    // - Online + NO gateway set up: simulated test-mode flow, marked "paid" immediately (never in production)
     let paymentStatus: "pending" | "paid" = free ? "paid" : "pending";
+    let paidFields: PaidFields | undefined;
     if (paymentMethod === "online") {
-      const rzpCreds = await getRazorpayCreds(shopId);
-      if (rzpCreds) {
-        const hasSignature = data.razorpayOrderId && data.razorpayPaymentId && data.razorpaySignature;
-        if (!hasSignature) {
-          return NextResponse.json({ error: "Missing payment verification details" }, { status: 400 });
-        }
-        const valid = verifyRazorpaySignature(rzpCreds, {
-          orderId: data.razorpayOrderId!,
-          paymentId: data.razorpayPaymentId!,
-          signature: data.razorpaySignature!,
-        });
-        if (!valid) {
+      const active = await getGateway(shopId);
+      if (active) {
+        // Normally the customer paid through the shop's active gateway. If the shop switched gateways while this customer was
+        // paying, accept the gateway they actually used - but only one the shop has its OWN keys saved for (see getGateway).
+        const used = data.paymentProvider ?? (data.razorpayOrderId ? "razorpay" : undefined);
+        const gateway = used && isProvider(used) && used !== active.provider ? await getGateway(shopId, used) : active;
+        if (!gateway) {
           return NextResponse.json({ error: "Payment verification failed" }, { status: 400 });
         }
-
-        // The signature only proves "this payment belongs to this Razorpay
-        // order" — not that the amount was right. /razorpay/create takes the
-        // amount from the client, so check what was actually charged against
-        // the price we calculated, otherwise a ₹1 payment could buy any order.
-        const rzpOrder = await fetchRazorpayOrder(rzpCreds, data.razorpayOrderId!);
-        if (Number(rzpOrder.amount) !== Math.round(price.total * 100) || rzpOrder.currency !== "INR") {
-          return NextResponse.json({ error: "Payment amount does not match the order total" }, { status: 400 });
+        const proof = await verifyPayment(gateway, data, chargeTotal);
+        if (!proof.ok) {
+          return NextResponse.json({ error: proof.error }, { status: proof.status });
         }
-
         // One payment can only ever pay for one order.
-        if (await Order.exists({ razorpayPaymentId: data.razorpayPaymentId })) {
+        if (await Order.exists(proof.unique)) {
           return NextResponse.json({ error: "This payment has already been used for an order" }, { status: 409 });
         }
+        paidFields = proof.fields;
         paymentStatus = "paid";
       } else if (process.env.NODE_ENV === "production") {
-        // Never auto-mark orders paid in production just because the Razorpay
-        // keys are missing/misconfigured — that would be free printing.
+        // Never auto-mark orders paid in production just because the payment keys are missing/misconfigured -
+        // that would be free printing.
         return NextResponse.json({ error: "Online payments are not available right now" }, { status: 503 });
       } else {
         paymentStatus = "paid"; // dev-only simulation, no real gateway configured
@@ -269,17 +273,24 @@ export async function POST(req: NextRequest) {
           priorityFee: price.priorityFee,
           gstRate: config.gstEnabled ? config.gstPercent : 0,
           gstAmount: price.gstAmount,
-          totalPrice: free ? 0 : price.total,
+          onlineFee: onlineFee.fee,
+          onlineFeeGst: onlineFee.gst,
+          totalPrice: free ? 0 : chargeTotal,
           paymentMethod,
           paymentStatus,
           printStatus: "queued",
-          razorpayPaymentId: data.razorpayPaymentId,
+          ...paidFields, // paymentProvider + the gateway's payment ids (online orders only)
           cancelKeyHash: hashCancelKey(cancelKey),
         });
         break;
       } catch (err: unknown) {
-        const isDuplicateToken =
-          typeof err === "object" && err !== null && "code" in err && (err as { code?: number }).code === 11000;
+        const e = err as { code?: number; keyPattern?: Record<string, unknown> } | null;
+        const isDuplicate = typeof err === "object" && err !== null && e?.code === 11000;
+        // A duplicate on anything but the token means the same payment was submitted twice at the same moment.
+        if (isDuplicate && e?.keyPattern && !("token" in e.keyPattern)) {
+          return NextResponse.json({ error: "This payment has already been used for an order" }, { status: 409 });
+        }
+        const isDuplicateToken = isDuplicate;
         if (!isDuplicateToken || attempt === 4) throw err;
         token = generateToken(); // collided with an order created moments ago — try a new one
       }
@@ -294,8 +305,8 @@ export async function POST(req: NextRequest) {
           $set: { name: data.customerName },
           $inc: {
             totalOrders: 1,
-            totalSpent: free ? 0 : price.total,
-            loyaltyPoints: free ? 0 : pointsForAmount(price.total),
+            totalSpent: free ? 0 : chargeTotal,
+            loyaltyPoints: free ? 0 : pointsForAmount(chargeTotal),
           },
         },
         { upsert: true }

@@ -20,6 +20,22 @@ const STATUS_FILTERS: { key: string; label: string }[] = [
 
 const ALERT_KEY = "qrprint_new_order_alert";
 
+function useCurrentTime(intervalMs: number) {
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    const update = () => setNow(Date.now());
+    const initialUpdate = setTimeout(update, 0);
+    const interval = setInterval(update, intervalMs);
+    return () => {
+      clearTimeout(initialUpdate);
+      clearInterval(interval);
+    };
+  }, [intervalMs]);
+
+  return now;
+}
+
 /** Two short rising tones (Web Audio, no sound file needed). Browsers allow it once the owner has clicked anywhere on the page. */
 function beep() {
   try {
@@ -524,15 +540,20 @@ function orderWhere(order: OrderDTO, printers: PrinterDTO[]): string {
 
 /** "On hold" countdown: the customer can still cancel, so the order isn't sent to the printer yet. */
 function HoldChip({ createdAt }: { createdAt: string }) {
-  const [, tick] = useState(0);
-  const left = Math.ceil((new Date(createdAt).getTime() + CANCEL_WINDOW_MS - Date.now()) / 1000);
-  useEffect(() => {
-    if (left <= 0) return;
-    const t = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [left > 0]); // eslint-disable-line react-hooks/exhaustive-deps -- only (re)start while the hold is active
-  if (left <= 0) return null;
+  const now = useCurrentTime(1000);
+  const left = now === null ? null : Math.ceil((new Date(createdAt).getTime() + CANCEL_WINDOW_MS - now) / 1000);
+  if (left === null || left <= 0) return null;
   return <Chip color="info">On hold, customer can still cancel · prints in {left}s</Chip>;
+}
+
+function NotCollectedChip({ updatedAt }: { updatedAt: string }) {
+  const now = useCurrentTime(60_000);
+  if (now === null) return null;
+
+  const age = now - new Date(updatedAt).getTime();
+  if (age <= 15 * 60_000) return null;
+  const minutes = Math.round(age / 60_000);
+  return <Chip color="warning">Not collected for {minutes} min</Chip>;
 }
 
 function OrderCard({
@@ -628,9 +649,7 @@ function OrderCard({
         {order.paymentStatus === "paid" && <Chip color="success">Paid</Chip>}
         {order.paymentStatus === "refunded" && <Chip color="warning">Refunded</Chip>}
         {awaitingOk && <Chip color="warning">Waiting for your OK, auto-print is off</Chip>}
-        {order.printStatus === "ready" && order.updatedAt && Date.now() - new Date(order.updatedAt).getTime() > 15 * 60000 && (
-          <Chip color="warning">Not collected for {Math.round((Date.now() - new Date(order.updatedAt).getTime()) / 60000)} min</Chip>
-        )}
+        {order.printStatus === "ready" && order.updatedAt && <NotCollectedChip updatedAt={order.updatedAt} />}
         {!awaitingOk && order.printStatus === "queued" && order.paymentStatus !== "pending" && <HoldChip createdAt={order.createdAt} />}
         {order.printStatus === "printing" && <Chip color="info">Printing…</Chip>}
         {order.printStatus === "ready" && <Chip color="success">Ready</Chip>}

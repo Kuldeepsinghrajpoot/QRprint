@@ -5,6 +5,7 @@ export type PaperSize = "A4" | "A3" | "Legal" | "Letter" | "Photo";
 export type BindingType = "none" | "spiral" | "lamination";
 export type PaymentMethod = "cash" | "online" | "free";
 export type PaymentStatus = "pending" | "paid" | "refunded";
+export type PaymentProvider = "razorpay" | "phonepe" | "paytm";
 export type PrintStatus = "queued" | "printing" | "ready" | "collected" | "failed" | "cancelled";
 
 export interface IOrder extends Document {
@@ -37,6 +38,8 @@ export interface IOrder extends Document {
   priorityFee: number;
   gstRate: number;
   gstAmount: number;
+  onlineFee: number; // gateway charge added for online payments (included in totalPrice)
+  onlineFeeGst: number; // GST on that charge (included in totalPrice)
   totalPrice: number;
 
   paymentMethod: PaymentMethod;
@@ -48,6 +51,11 @@ export interface IOrder extends Document {
   printedOn?: string; // Windows printer name it was sent to
   readyBy?: "agent" | "staff"; // who set "ready": the Print Agent (really printed) or staff by hand (may never have printed)
   razorpayPaymentId?: string;
+  // Which gateway took the money. Refunds must go back through the SAME gateway, even if the shop later switches.
+  // Orders from before PhonePe/Paytm existed have none of these three and are treated as Razorpay.
+  paymentProvider?: PaymentProvider;
+  gatewayOrderId?: string; // PhonePe merchantOrderId / Paytm orderId (our own id, one per payment)
+  gatewayTxnId?: string; // Paytm transaction id (needed to refund) / PhonePe transaction id
   cancelledAt?: Date;
   cancelledBy?: "customer" | "shop";
   cancelReason?: string;
@@ -87,6 +95,8 @@ const OrderSchema = new Schema<IOrder>(
     priorityFee: { type: Number, default: 0 },
     gstRate: { type: Number, default: 0 },
     gstAmount: { type: Number, default: 0 },
+    onlineFee: { type: Number, default: 0 },
+    onlineFeeGst: { type: Number, default: 0 },
     totalPrice: { type: Number, required: true },
 
     paymentMethod: { type: String, enum: ["cash", "online", "free"], required: true },
@@ -102,6 +112,9 @@ const OrderSchema = new Schema<IOrder>(
     printedOn: { type: String },
     readyBy: { type: String, enum: ["agent", "staff"] },
     razorpayPaymentId: { type: String, unique: true, sparse: true },
+    paymentProvider: { type: String, enum: ["razorpay", "phonepe", "paytm"] },
+    gatewayOrderId: { type: String, unique: true, sparse: true }, // one payment can only ever pay for one order
+    gatewayTxnId: { type: String },
     cancelledAt: { type: Date },
     cancelledBy: { type: String, enum: ["customer", "shop"] },
     cancelReason: { type: String, maxlength: 200 },

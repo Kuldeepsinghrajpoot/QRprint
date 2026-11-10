@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   try {
     await connectDB();
     const filter = buildOrderFilter(session.shopId, req.nextUrl.searchParams);
-    const orders = await Order.find(filter).select("-fileKey -fileUrl -razorpayPaymentId").sort({ createdAt: -1 }).limit(MAX_ROWS).lean();
+    const orders = await Order.find(filter).select("-fileKey -fileUrl -razorpayPaymentId -gatewayOrderId -gatewayTxnId").sort({ createdAt: -1 }).limit(MAX_ROWS).lean();
 
     const tz = shopTimezone();
     const date = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });

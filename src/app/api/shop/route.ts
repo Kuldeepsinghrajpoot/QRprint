@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
 import { Shop } from "@/models/Shop";
+import { User } from "@/models/User";
+import { isContactComplete } from "@/lib/shopContact";
 import { PricingConfig } from "@/models/PricingConfig";
 import { getSession } from "@/lib/session";
 import { slugProblem, customerUrl } from "@/lib/shop";
@@ -9,17 +11,25 @@ import { shopUrlForSlug } from "@/lib/shopUrl";
 
 export const runtime = "nodejs";
 
-/** GET /api/shop — this shop's name, sub-address and customer link. */
+/** GET /api/shop — this shop's name, sub-address, customer link and business details. */
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await connectDB();
   const [shop, config] = await Promise.all([
-    Shop.findOne({ shopId: session.shopId }).select("slug name").lean(),
+    Shop.findOne({ shopId: session.shopId }).select("slug name contactEmail contactPhone contactAddress").lean(),
     PricingConfig.findOne({ shopId: session.shopId }).select("shopName").lean(),
   ]);
   const slug = shop?.slug ?? "";
+  // Pre-fill the email box with the owner's login email (only shown as a suggestion; nothing is saved until the owner saves).
+  const suggestedEmail = shop?.contactEmail ? "" : (await User.findById(session.userId).select("email").lean())?.email ?? "";
   return NextResponse.json({
+    isOwner: session.role === "owner",
+    contactEmail: shop?.contactEmail ?? "",
+    contactPhone: shop?.contactPhone ?? "",
+    contactAddress: shop?.contactAddress ?? "",
+    contactComplete: isContactComplete(shop),
+    suggestedEmail,
     shopId: session.shopId,
     name: config?.shopName || shop?.name || "",
     slug,

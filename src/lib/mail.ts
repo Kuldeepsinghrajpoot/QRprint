@@ -103,26 +103,41 @@ export function welcomeEmail(p: { name: string; shopName: string; shopUrl: strin
   return { subject, text, html };
 }
 
-/** Sent to the owner whenever the shop's Razorpay keys are added, changed or removed, so a hijacked login is noticed. */
-export function razorpayChangedEmail(p: { name: string; shopName: string; action: "added" | "changed" | "removed"; keyId?: string; when: string }) {
-  const { name, shopName, action, keyId, when } = p;
-  const what = action === "removed" ? "were removed" : `were ${action}`;
-  const subject = `Security: Razorpay keys ${what} for ${shopName}`;
+/**
+ * Sent to the owner whenever the shop's payment keys (Razorpay / PhonePe / Paytm) are added, changed or removed, or the active
+ * gateway is switched - changing where customers' money goes - so a hijacked login is noticed.
+ */
+export function paymentSettingsChangedEmail(p: {
+  name: string;
+  shopName: string;
+  gateway: string; // "Razorpay" | "PhonePe" | "Paytm"
+  action: "added" | "changed" | "removed" | "switched";
+  detail?: string; // the public key / client / merchant id, never a secret
+  activeNow?: string; // the gateway customers pay through after this change
+  when: string;
+}) {
+  const { name, shopName, gateway, action, detail, activeNow, when } = p;
+  const headline = action === "switched" ? `Payments now use ${gateway}` : `${gateway} keys were ${action}`;
+  const line =
+    action === "switched"
+      ? `The online payment gateway for "${shopName}" was switched to ${gateway} on ${when}. Customers now pay through ${gateway}.`
+      : `The ${gateway} payment keys for "${shopName}" were ${action} on ${when}.${activeNow ? ` Customers now pay through ${activeNow}.` : ""}`;
+  const subject = `Security: ${headline} for ${shopName}`;
   const text = [
     `Hi ${name},`,
     ``,
-    `The Razorpay payment keys for "${shopName}" ${what} on ${when}.`,
-    keyId ? `Key ID: ${keyId}` : ``,
+    line,
+    detail ? `ID: ${detail}` : ``,
     ``,
     `If this was you, no action is needed.`,
-    `If it was not you, change your password right away (Settings -> Change password) and generate new keys in your Razorpay dashboard.`,
+    `If it was not you, change your password right away (Settings -> Change password) and generate new keys in your ${gateway} dashboard.`,
   ].join("\n");
   const html = `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#0f172a;line-height:1.55">
-<h2 style="margin:0 0 12px">Razorpay keys ${esc(what)}</h2>
-<p>Hi ${esc(name)}, the Razorpay payment keys for <b>${esc(shopName)}</b> ${esc(what)} on ${esc(when)}.</p>
-${keyId ? `<p style="color:#475569">Key ID: <code>${esc(keyId)}</code></p>` : ""}
+<h2 style="margin:0 0 12px">${esc(headline)}</h2>
+<p>Hi ${esc(name)}, ${esc(line)}</p>
+${detail ? `<p style="color:#475569">ID: <code>${esc(detail)}</code></p>` : ""}
 <p>If this was you, no action is needed.</p>
-<p style="color:#b91c1c"><b>If it was not you</b>, change your password right away (Settings &rarr; Change password) and generate new keys in your Razorpay dashboard.</p>
+<p style="color:#b91c1c"><b>If it was not you</b>, change your password right away (Settings &rarr; Change password) and generate new keys in your ${esc(gateway)} dashboard.</p>
 </div>`;
   return { subject, text, html };
 }

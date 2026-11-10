@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { PricingConfigDTO, PaperSize, PrintType } from "@/types/order";
 import LineIcon from "@/components/lexical/LineIcon";
+import { isOffered, offeredTypes } from "@/lib/pricing";
 import { Alert, Button, Card, CardHeader, CellInput, Chip, NumberField, Switch } from "@/components/lexical/ui";
 
 const PAPER_SIZES: PaperSize[] = ["A4", "A3", "Legal", "Letter", "Photo"];
@@ -36,6 +37,13 @@ export default function PricingPage() {
         },
       },
     });
+  }
+
+  function setOffered(size: PaperSize, type: PrintType, on: boolean) {
+    if (!config) return;
+    const current = Object.fromEntries(PAPER_SIZES.map((s) => [s, { bw: isOffered(config.availability, s, "bw"), color: isOffered(config.availability, s, "color") }])) as Record<PaperSize, Record<PrintType, boolean>>;
+    current[size][type] = on;
+    setConfig({ ...config, availability: current });
   }
 
   async function handleSave() {
@@ -83,14 +91,21 @@ export default function PricingPage() {
         </Alert>
       )}
 
+      {offeredTypes(config.availability).length === 0 && !config.freePrinting && (
+        <Alert tone="warning" icon="🚫">
+          Nothing is ticked in the table below, so customers can&apos;t place orders. Tick the paper sizes and print types you can print.
+        </Alert>
+      )}
+
       {/* Tiered pricing table */}
       <Card>
-        <CardHeader icon={<LineIcon name="files" size={24} />} title="Tiered Pricing (₹ per page)" subtitle="Price per page changes as the page count grows" />
+        <CardHeader icon={<LineIcon name="files" size={24} />} title="Tiered Pricing (₹ per page)" subtitle="Tick what you can print. Unticked rows are hidden from customers" />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="bg-[#F8FAFC] text-left text-xs font-semibold uppercase tracking-wide text-slate-900/60">
-                <th className="px-6 py-3">Paper Size</th>
+                <th className="px-6 py-3">Offer</th>
+                <th className="px-3 py-3">Paper Size</th>
                 <th className="px-3 py-3">Type</th>
                 <th className="px-3 py-3">Page 1</th>
                 <th className="px-3 py-3">Page 2–10</th>
@@ -100,8 +115,17 @@ export default function PricingPage() {
             <tbody>
               {PAPER_SIZES.map((size) =>
                 PRINT_TYPES.map((type) => (
-                  <tr key={`${size}-${type}`} className="border-t border-slate-900/[0.07] transition">
-                    <td className="px-6 py-2.5 font-semibold text-slate-900/90">
+                  <tr key={`${size}-${type}`} className={`border-t border-slate-900/[0.07] transition ${isOffered(config.availability, size, type) ? "" : "opacity-50"}`}>
+                    <td className="px-6 py-2.5">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 cursor-pointer accent-[color:var(--accent)]"
+                        checked={isOffered(config.availability, size, type)}
+                        onChange={(e) => setOffered(size, type, e.target.checked)}
+                        aria-label={`Offer ${type === "bw" ? "black & white" : "colour"} printing on ${size}`}
+                      />
+                    </td>
+                    <td className="px-3 py-2.5 font-semibold text-slate-900/90">
                       {type === "bw" ? (size === "Photo" ? "📷 Photo" : size) : ""}
                     </td>
                     <td className="px-3 py-2.5">
@@ -146,6 +170,22 @@ export default function PricingPage() {
               </div>
             )}
             <Switch
+              checked={!!config.onlineFeeEnabled}
+              onChange={(v) => setConfig({ ...config, onlineFeeEnabled: v })}
+              title="Add online payment fee"
+              description="Passes the gateway's charge to customers who pay online (UPI/card), e.g. Razorpay: 2% + 18% GST on that 2%. Cash orders never pay it."
+            />
+            {config.onlineFeeEnabled && (
+              <div className="grid max-w-[420px] grid-cols-2 gap-4">
+                <NumberField label="Gateway fee %" value={config.onlineFeePercent ?? 2} onChange={(v) => setConfig({ ...config, onlineFeePercent: v })} />
+                <NumberField label="GST on fee %" value={config.onlineFeeGstPercent ?? 18} onChange={(v) => setConfig({ ...config, onlineFeeGstPercent: v })} />
+                <p className="col-span-2 text-xs text-slate-900/60">
+                  Check your gateway&apos;s rate: Razorpay charges 2% + 18% GST (about 2.36% in all); PhonePe and Paytm rates depend on your agreement.
+                  A ₹500 order would cost an online customer ₹{500 + Math.round((500 * (config.onlineFeePercent ?? 2)) / 100) + Math.round((Math.round((500 * (config.onlineFeePercent ?? 2)) / 100) * (config.onlineFeeGstPercent ?? 18)) / 100)}.
+                </p>
+              </div>
+            )}
+            <Switch
               checked={!!config.freePrinting}
               onChange={(v) => {
                 if (v) {
@@ -163,7 +203,7 @@ export default function PricingPage() {
               description="For colleges and offices: customers just upload and send. No payment step, no revenue."
             />
             <Switch checked={!config.freePrinting && config.cashPaymentEnabled} onChange={(v) => setConfig({ ...config, cashPaymentEnabled: v })} title="Accept Cash payments" description={config.freePrinting ? "Off while free printing is on" : "Customer pays at the counter"} disabled={!!config.freePrinting} />
-            <Switch checked={!config.freePrinting && config.onlinePaymentEnabled} onChange={(v) => setConfig({ ...config, onlinePaymentEnabled: v })} title="Accept Online (UPI/Card) payments" description={config.freePrinting ? "Off while free printing is on" : "Razorpay checkout on the customer page"} disabled={!!config.freePrinting} />
+            <Switch checked={!config.freePrinting && config.onlinePaymentEnabled} onChange={(v) => setConfig({ ...config, onlinePaymentEnabled: v })} title="Accept Online (UPI/Card) payments" description={config.freePrinting ? "Off while free printing is on" : "Checkout through your active gateway (Razorpay, PhonePe or Paytm: Settings → Online payments)"} disabled={!!config.freePrinting} />
             {!config.freePrinting && !config.cashPaymentEnabled && !config.onlinePaymentEnabled && (
               <Alert tone="warning" icon="🚫">
                 Both payment methods are off, so customers can&apos;t place orders. Their page will say the shop isn&apos;t taking orders.

@@ -16,16 +16,22 @@ const paperRates = z.object({ bw: tier, color: tier });
 // Whitelist of editable fields. Previously the raw request body was passed to
 // findOneAndUpdate, allowing negative/NaN prices and arbitrary field writes
 // (e.g. shopId).
+const availabilityFlags = z.object({ bw: z.boolean(), color: z.boolean() });
+
 const pricingSchema = z
   .object({
     shopName: z.string().trim().min(1).max(100),
     rates: z.object({ A4: paperRates, A3: paperRates, Legal: paperRates, Letter: paperRates, Photo: paperRates }),
+    availability: z.object({ A4: availabilityFlags, A3: availabilityFlags, Legal: availabilityFlags, Letter: availabilityFlags, Photo: availabilityFlags }),
     duplexDiscountPercent: z.number().min(0).max(100),
     bindingSpiralCharge: z.number().min(0).max(100000),
     bindingLaminationCharge: z.number().min(0).max(100000),
     priorityFeePercent: z.number().min(0).max(1000),
     gstEnabled: z.boolean(),
     gstPercent: z.number().min(0).max(100),
+    onlineFeeEnabled: z.boolean(),
+    onlineFeePercent: z.number().min(0).max(10),
+    onlineFeeGstPercent: z.number().min(0).max(100),
     freePrinting: z.boolean(),
     cashPaymentEnabled: z.boolean(),
     onlinePaymentEnabled: z.boolean(),

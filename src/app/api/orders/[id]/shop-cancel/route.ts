@@ -5,7 +5,7 @@ import { connectDB } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
 import { getSession } from "@/lib/session";
 import { purgeOrderFile } from "@/lib/fileCleanup";
-import { getRazorpayCreds, refundRazorpayPayment } from "@/lib/razorpay";
+import { refundOnlinePayment } from "@/lib/payments";
 import { sendOrderNotification, cancelledMessage } from "@/lib/notify";
 import { serverError } from "@/lib/apiError";
 
@@ -16,7 +16,7 @@ const schema = z.object({ reason: z.string().trim().max(200).optional() });
 /**
  * POST /api/orders/:id/shop-cancel - the shop cancels a print from the dashboard
  * (customer changed their mind, wrong file, printer problem...). Works while the order is queued, printing or failed.
- *  - Online payment: refunded through Razorpay automatically.
+ *  - Online payment: refunded automatically through the gateway that took it (Razorpay, PhonePe or Paytm).
  *  - Cash already received: marked refunded and the response says how much cash to hand back.
  *  - The stored file is deleted and the customer is notified.
  * If the job was already sent to the printer, paper may still come out - the response says so (`wasPrinting`).
@@ -62,20 +62,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let cashToReturn = 0;
     if (cancelled.paymentStatus === "paid") {
       if (cancelled.paymentMethod === "online") {
-        const rzpCreds = cancelled.razorpayPaymentId ? await getRazorpayCreds(cancelled.shopId) : null;
-        if (cancelled.razorpayPaymentId && rzpCreds) {
-          try {
-            await refundRazorpayPayment(rzpCreds, cancelled.razorpayPaymentId);
+        try {
+          if ((await refundOnlinePayment(cancelled)) === "refunded") {
             refundIssued = true;
             cancelled.paymentStatus = "refunded";
             await cancelled.save();
-          } catch (err) {
-            // The order stays cancelled; the shop must refund this one manually from the payment dashboard.
-            refundFailed = true;
-            console.error(`Refund failed for order ${cancelled.token}:`, err);
+          } else {
+            refundFailed = true; // nothing to refund through (no payment reference, or the gateway keys are gone)
           }
-        } else {
+        } catch (err) {
+          // The order stays cancelled; the shop must refund this one manually from the payment dashboard.
           refundFailed = true;
+          console.error(`Refund failed for order ${cancelled.token}:`, err);
         }
       } else {
         cashToReturn = cancelled.totalPrice;

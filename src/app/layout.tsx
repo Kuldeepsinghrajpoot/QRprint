@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { PALETTE_INIT_SCRIPT } from "@/lib/palettes";
+import { publicSans } from "@/components/landing/fonts";
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.qr.lexicalsoftware.in";
 const DESCRIPTION =
@@ -25,7 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: PALETTE_INIT_SCRIPT }} />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className={`${publicSans.className} min-h-full flex flex-col`}>{children}</body>
     </html>
   );
 }

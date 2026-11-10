@@ -65,6 +65,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   draw(`Subtotal: Rs. ${order.subtotal}`);
   if (order.priorityFee > 0) draw(`Priority/Rush Fee: Rs. ${order.priorityFee}`);
   if (order.gstAmount > 0) draw(`GST (${order.gstRate}%): Rs. ${order.gstAmount}`);
+  if ((order.onlineFee ?? 0) > 0) draw(`Online payment fee: Rs. ${order.onlineFee}`);
+  if ((order.onlineFeeGst ?? 0) > 0) draw(`GST on online payment fee: Rs. ${order.onlineFeeGst}`);
   draw(`Total Paid: Rs. ${order.totalPrice}`, { f: bold, size: 13, color: [0.09, 0.64, 0.29] });
   draw(`Payment Method: ${order.paymentMethod === "cash" ? "Cash" : order.paymentMethod === "free" ? "Free (no charge)" : "UPI / Online"}`);
   draw(`Payment Status: ${order.paymentStatus.toUpperCase()}`);

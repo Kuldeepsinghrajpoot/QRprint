@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     const pages = Math.max(1, Math.ceil(total / limit));
     const page = Math.min(pages, Math.max(1, parseInt(sp.get("page") || "1", 10) || 1));
     const orders = await Order.find(filter)
-      .select("-fileKey -fileUrl -razorpayPaymentId")
+      .select("-fileKey -fileUrl -razorpayPaymentId -gatewayOrderId -gatewayTxnId")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)

@@ -116,7 +116,7 @@ export default function PrintersPage() {
   }
 
   /** Staff accepts what Windows reported: B&W-only printers become "B&W only", colour-capable ones "B&W + Color". */
-  async function useDetectedType(p: PrinterDTO) {
+  async function applyDetectedType(p: PrinterDTO) {
     if (typeof p.colorCapable !== "boolean") return;
     const detected: PrinterDTO["type"] = p.colorCapable ? "both" : "bw";
     await fetch(`/api/printers/${p._id}`, {
@@ -358,7 +358,7 @@ export default function PrintersPage() {
                   {p.colorCapable === false && p.type !== "bw" && (
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
                       <span>Windows says this printer prints B&amp;W only, but it is set to {TYPE_LABEL[p.type]}.</span>
-                      <button onClick={() => useDetectedType(p)} className="rounded-md border border-amber-400 px-2.5 py-1 font-semibold active:bg-amber-100">
+                      <button onClick={() => applyDetectedType(p)} className="rounded-md border border-amber-400 px-2.5 py-1 font-semibold active:bg-amber-100">
                         Set to B&amp;W only
                       </button>
                     </div>
@@ -366,7 +366,7 @@ export default function PrintersPage() {
                   {p.colorCapable === true && p.type === "bw" && (
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
                       <span>Windows says this printer can print colour. It is set to B&amp;W only.</span>
-                      <button onClick={() => useDetectedType(p)} className="rounded-md border border-sky-400 px-2.5 py-1 font-semibold active:bg-sky-100">
+                      <button onClick={() => applyDetectedType(p)} className="rounded-md border border-sky-400 px-2.5 py-1 font-semibold active:bg-sky-100">
                         Set to B&amp;W + Color
                       </button>
                     </div>

@@ -19,6 +19,9 @@ export interface IPricingConfig extends Document {
     Photo: { bw: ITierRate; color: ITierRate };
   };
 
+  // Which paper size + print type combinations this shop can print (unticked = hidden from customers, orders refused)
+  availability: Record<"A4" | "A3" | "Legal" | "Letter" | "Photo", { bw: boolean; color: boolean }>;
+
   // Flat add-on charges
   duplexDiscountPercent: number; // % discount on subtotal for double-side printing (paper saving)
   bindingSpiralCharge: number;
@@ -27,6 +30,11 @@ export interface IPricingConfig extends Document {
 
   gstEnabled: boolean;
   gstPercent: number;
+
+  // Online payment charge passed on to the customer (gateway fee + GST on that fee); never applied to cash orders
+  onlineFeeEnabled: boolean;
+  onlineFeePercent: number; // e.g. 2 = Razorpay's 2% per transaction
+  onlineFeeGstPercent: number; // GST on the fee itself, e.g. 18
 
   freePrinting: boolean; // no payment at all (college / office): orders go straight to the queue and earn no revenue
   cashPaymentEnabled: boolean;
@@ -91,6 +99,10 @@ const PricingConfigSchema = new Schema<IPricingConfig>(
       },
     },
 
+    availability: Object.fromEntries(
+      ["A4", "A3", "Legal", "Letter", "Photo"].map((s) => [s, { bw: { type: Boolean, default: true }, color: { type: Boolean, default: true } }])
+    ),
+
     duplexDiscountPercent: { type: Number, default: 10 },
     bindingSpiralCharge: { type: Number, default: 20 },
     bindingLaminationCharge: { type: Number, default: 5 },
@@ -98,6 +110,10 @@ const PricingConfigSchema = new Schema<IPricingConfig>(
 
     gstEnabled: { type: Boolean, default: false },
     gstPercent: { type: Number, default: 18 },
+
+    onlineFeeEnabled: { type: Boolean, default: false },
+    onlineFeePercent: { type: Number, default: 2 },
+    onlineFeeGstPercent: { type: Number, default: 18 },
 
     freePrinting: { type: Boolean, default: false },
     cashPaymentEnabled: { type: Boolean, default: true },
