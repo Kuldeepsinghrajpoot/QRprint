@@ -6,7 +6,7 @@ import { getSession } from "@/lib/session";
 import { encryptSecret, encryptionKeyProblem } from "@/lib/secretBox";
 import { User } from "@/models/User";
 import { verifyPassword } from "@/lib/auth";
-import { sendMail, razorpayChangedEmail } from "@/lib/mail";
+import { sendMail, paymentSettingsChangedEmail } from "@/lib/mail";
 import { checkRazorpayKeys } from "@/lib/razorpay";
 import { serverError } from "@/lib/apiError";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
@@ -51,7 +51,14 @@ async function notifyOwner(
   keyId?: string
 ) {
   const when = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }) + " (IST)";
-  const mail = razorpayChangedEmail({ name: user.name, shopName, action, keyId, when });
+  const mail = paymentSettingsChangedEmail({
+    name: user.name,
+    shopName,
+    gateway: "Razorpay",
+    action,
+    detail: keyId,
+    when,
+  });
   // Best effort: a mail problem must never block or undo the change itself.
   await Promise.race([sendMail({ to: user.email, ...mail }).catch(() => false), new Promise((r) => setTimeout(r, 6000))]);
 }
