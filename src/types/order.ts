@@ -120,6 +120,7 @@ export interface AgentDTO {
   os?: string;
   appVersion?: string;
   lastSeenAt: string;
+  status: "online" | "offline";
   online: boolean;
   printers: {
     printerId: string;

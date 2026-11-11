@@ -3,7 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import { Agent } from "@/models/Agent";
 import { Printer } from "@/models/Printer";
 import { getSession } from "@/lib/session";
-import { isFresh } from "@/lib/printerHosts";
+import { isAgentOnline, isFresh } from "@/lib/printerHosts";
 
 export const runtime = "nodejs";
 
@@ -30,7 +30,8 @@ export async function GET() {
       os: a.os,
       appVersion: a.appVersion,
       lastSeenAt: a.lastSeenAt,
-      online: isFresh({ status: "online", lastSeenAt: a.lastSeenAt }, now),
+      status: a.status ?? "offline",
+      online: isAgentOnline({ status: a.status, lastSeenAt: a.lastSeenAt }, now),
       printers: printers.flatMap((p) =>
         (p.hosts ?? [])
           .filter((h) => h.agentId === a.agentId)

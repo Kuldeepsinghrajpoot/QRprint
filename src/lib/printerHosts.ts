@@ -2,11 +2,20 @@ import type { IPrinterHost, PrinterStatus } from "@/models/Printer";
 
 /** Agent heartbeat is every ~30s; 2 minutes of silence = that computer is offline. */
 export const HOST_STALE_MS = 2 * 60 * 1000;
+export const AGENT_STALE_MS = 45 * 1000;
 
 type HostLike = Pick<IPrinterHost, "status" | "lastSeenAt">;
 
 export const isFresh = (h: HostLike, now = new Date()): boolean =>
   now.getTime() - new Date(h.lastSeenAt).getTime() <= HOST_STALE_MS;
+
+export function isAgentOnline(
+  agent: { status?: "online" | "offline"; lastSeenAt: Date | string },
+  now = new Date(),
+): boolean {
+  const age = now.getTime() - new Date(agent.lastSeenAt).getTime();
+  return agent.status === "online" && age >= 0 && age < AGENT_STALE_MS;
+}
 
 export function isVersionConflictError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;

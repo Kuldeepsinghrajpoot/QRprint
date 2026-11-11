@@ -68,6 +68,7 @@ export default function CustomerPage() {
   // Where this shop's policy pages live: "" on its own sub-address (/terms is that shop's), "/<shop>" on the main address.
   const [policyBase, setPolicyBase] = useState("");
   const [shopKey, setShopKey] = useState(""); // the shop's slug or id, for the footer's business details
+  const [shopOnline, setShopOnline] = useState<boolean | null>(null);
   const [queue, setQueue] = useState<{ ahead: number; minutes: number } | null>(null);
   useEffect(() => {
     // On a shop sub-address the shop is the first part of the host name; old QR links use ?shop=<id>.
@@ -94,6 +95,29 @@ export default function CustomerPage() {
       .catch((e) => setError(e instanceof Error && e.message.includes("Shop not found")
         ? "This shop link isn't valid. Please scan the shop's QR code again."
         : "Could not load shop pricing. Please refresh."));
+  }, []);
+
+  useEffect(() => {
+    let stop = false;
+    async function loadShopStatus() {
+      try {
+        const shop = shopRef.current || "main";
+        const res = await fetch(`/api/shop/public?shop=${encodeURIComponent(shop)}`, { cache: "no-store" });
+        if (!res.ok) throw new Error("Could not load shop status");
+        const data: { online?: boolean } = await res.json();
+        if (!stop && typeof data.online === "boolean") setShopOnline(data.online);
+      } catch {
+        if (!stop) setShopOnline(null);
+      }
+    }
+
+    const first = setTimeout(loadShopStatus, 400);
+    const interval = setInterval(loadShopStatus, 15000);
+    return () => {
+      stop = true;
+      clearTimeout(first);
+      clearInterval(interval);
+    };
   }, []);
 
   // Live queue: how many orders are waiting and about how long, refreshed every 30 seconds while the page is open.
@@ -470,6 +494,25 @@ export default function CustomerPage() {
               {config?.shopName || "QRtoPrint"}
             </h1>
             <p className="text-[13px] text-slate-900/60">{free ? "Upload your file and collect it at the counter. Printing is free." : "Upload your file, pay, collect it at the counter."}</p>
+            <div
+              className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                shopOnline === null
+                  ? "bg-slate-100 text-slate-500"
+                  : shopOnline
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-red-50 text-red-700"
+              }`}
+              role="status"
+              title="Online status reflects the shop's print agent connection"
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${
+                shopOnline === null ? "bg-slate-400" : shopOnline ? "bg-emerald-500" : "bg-red-500"
+              }`} />
+              {shopOnline === null ? "Shop status unavailable" : shopOnline ? "Shop online" : "Shop offline"}
+            </div>
+            {shopOnline === false && (
+              <p className="mt-1 text-[11px] text-slate-500">You can still place an order, but printing may be delayed.</p>
+            )}
           </div>
         </header>
 

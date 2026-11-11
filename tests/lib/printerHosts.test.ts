@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { withVersionRetry } from "@/lib/printerHosts";
+import { AGENT_STALE_MS, isAgentOnline, withVersionRetry } from "@/lib/printerHosts";
+
+describe("isAgentOnline", () => {
+  const now = new Date("2026-11-11T12:00:00.000Z");
+
+  it("requires online status and a heartbeat younger than 45 seconds", () => {
+    expect(isAgentOnline({ status: "online", lastSeenAt: new Date(now.getTime() - AGENT_STALE_MS + 1) }, now)).toBe(true);
+    expect(isAgentOnline({ status: "offline", lastSeenAt: now }, now)).toBe(false);
+    expect(isAgentOnline({ status: "online", lastSeenAt: new Date(now.getTime() - AGENT_STALE_MS) }, now)).toBe(false);
+  });
+});
 
 describe("withVersionRetry", () => {
   it("retries after a document version conflict", async () => {

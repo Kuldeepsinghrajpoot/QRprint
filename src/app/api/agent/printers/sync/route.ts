@@ -111,6 +111,7 @@ export async function POST(req: NextRequest) {
             model: agent.model,
             os: agent.os,
             appVersion: agent.appVersion,
+            status: "online",
             lastSeenAt: now,
           },
           $setOnInsert: { shopId, agentId: agent.id },

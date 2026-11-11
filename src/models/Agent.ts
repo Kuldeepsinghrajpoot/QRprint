@@ -10,6 +10,7 @@ export interface IAgent extends Omit<Document, "model"> {
   model?: string; // computer model number
   os?: string;
   appVersion?: string;
+  status?: "online" | "offline";
   lastSeenAt: Date;
 }
 
@@ -23,6 +24,7 @@ const AgentSchema = new Schema<IAgent>(
     model: String,
     os: String,
     appVersion: String,
+    status: { type: String, enum: ["online", "offline"], default: "online" },
     lastSeenAt: { type: Date, required: true },
   },
   { timestamps: true }
