@@ -10,7 +10,8 @@ import { LEGAL_LINKS } from "./LegalLinks";
 import { publicSans } from "./fonts";
 import LoginModal from "./LoginModal";
 import MobileMenu from "./MobileMenu";
-
+import InstallGuide from "@/components/InstallGuide";
+const AGENT_DOWNLOAD_URL = "https://github.com/Kuldeepsinghrajpoot/QR-printer-agent/releases/download/v1.0.12/QRtoPrint-Setup-1.0.12.exe"
 
 const waReady = /^\d{10,15}$/.test(SITE.whatsapp); // hide WhatsApp button until a real number is set
 const wa = `https://wa.me/${SITE.whatsapp}?text=${encodeURIComponent(`Hi, I'd like to know more about ${SITE.name}.`)}`;
@@ -109,7 +110,7 @@ export default function Landing() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
           <a href="#" className="flex items-center gap-2.5 font-display text-2xl font-extrabold text-brand"><Image src="/chhapo-logo.svg" alt="" width={36} height={36} />{SITE.name}</a>
           <nav className="hidden gap-7 text-sm font-medium md:flex">
-            {[["How it works", "#how"], ["Features", "#features"], ["Pricing", "#pricing"], ["FAQ", "#faq"]].map(([l, h]) => (
+            {[["How it works", "#how"], ["Features", "#features"], ["Pricing", "#pricing"], ["Install", "/print-agent"], ["FAQ", "#faq"]].map(([l, h]) => (
               <a key={h} href={h} className="hover:text-brand">{l}</a>
             ))}
           </nav>
@@ -242,6 +243,7 @@ export default function Landing() {
             </div>
           </div>
         </section>
+
 
         <section id="faq" className="mx-auto max-w-3xl px-5 py-20">
           <h2 className="font-display text-4xl font-extrabold">Questions, answered.</h2>

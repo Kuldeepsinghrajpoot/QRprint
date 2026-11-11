@@ -55,7 +55,7 @@ export default function PricingPage() {
       const res = await fetch("/api/settings/pricing", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
+        body: JSON.stringify({ ...config, gstEnabled: false, onlineFeeEnabled: false }), // GST and the online fee are no longer offered, so saving switches them off
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save");
@@ -161,30 +161,8 @@ export default function PricingPage() {
         </div>
         {/* GST & payments */}
         <Card>
-          <CardHeader icon={<LineIcon name="files" size={24} />} title="GST & Payments" subtitle="Tax and accepted payment methods" />
+          <CardHeader icon={<LineIcon name="files" size={24} />} title="Payments" subtitle="Accepted payment methods" />
           <div className="space-y-3 px-6 pb-6">
-            <Switch checked={config.gstEnabled} onChange={(v) => setConfig({ ...config, gstEnabled: v })} title="Enable GST" description="Adds GST to every order total" />
-            {config.gstEnabled && (
-              <div className="max-w-[200px]">
-                <NumberField label="GST %" value={config.gstPercent} onChange={(v) => setConfig({ ...config, gstPercent: v })} />
-              </div>
-            )}
-            <Switch
-              checked={!!config.onlineFeeEnabled}
-              onChange={(v) => setConfig({ ...config, onlineFeeEnabled: v })}
-              title="Add online payment fee"
-              description="Passes the gateway's charge to customers who pay online (UPI/card), e.g. Razorpay: 2% + 18% GST on that 2%. Cash orders never pay it."
-            />
-            {config.onlineFeeEnabled && (
-              <div className="grid max-w-[420px] grid-cols-2 gap-4">
-                <NumberField label="Gateway fee %" value={config.onlineFeePercent ?? 2} onChange={(v) => setConfig({ ...config, onlineFeePercent: v })} />
-                <NumberField label="GST on fee %" value={config.onlineFeeGstPercent ?? 18} onChange={(v) => setConfig({ ...config, onlineFeeGstPercent: v })} />
-                <p className="col-span-2 text-xs text-slate-900/60">
-                  Check your gateway&apos;s rate: Razorpay charges 2% + 18% GST (about 2.36% in all); PhonePe and Paytm rates depend on your agreement.
-                  A ₹500 order would cost an online customer ₹{500 + Math.round((500 * (config.onlineFeePercent ?? 2)) / 100) + Math.round((Math.round((500 * (config.onlineFeePercent ?? 2)) / 100) * (config.onlineFeeGstPercent ?? 18)) / 100)}.
-                </p>
-              </div>
-            )}
             <Switch
               checked={!!config.freePrinting}
               onChange={(v) => {

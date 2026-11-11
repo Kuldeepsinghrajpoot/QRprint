@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { PALETTE_INIT_SCRIPT } from "@/lib/palettes";
 import { publicSans } from "@/components/landing/fonts";
@@ -24,7 +25,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: PALETTE_INIT_SCRIPT }} />
+        <Script
+          id="palette-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: PALETTE_INIT_SCRIPT }}
+        />
       </head>
       <body className={`${publicSans.className} min-h-full flex flex-col`}>{children}</body>
     </html>

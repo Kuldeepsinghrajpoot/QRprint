@@ -81,8 +81,8 @@ export default function CustomerPage() {
       /* storage blocked — the query string still works for this page view */
     }
     shopRef.current = shop;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the address is only known in the browser
     setPolicyBase(slugFromHostname(window.location.hostname) || !shop ? "" : `/${encodeURIComponent(shop)}`);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- same reason
     setShopKey(shop);
     fetch(`/api/settings/pricing${shop ? `?shop=${encodeURIComponent(shop)}` : ""}`)
       .then(async (r) => {
@@ -728,7 +728,7 @@ export default function CustomerPage() {
                 </div>
               )}
 
-              {ruleMessage && <p className="-mb-3 text-[13px] font-medium text-amber-700">{ruleMessage}</p>}
+              {ruleMessage && <p className="-mb-10 text-[13px] font-medium text-amber-700">{ruleMessage}</p>}
 
               {/* Always-visible total + action, so the price never scrolls out of sight on a phone */}
               <div className="sticky bottom-3 z-10 flex items-center gap-3 rounded-[10px] border border-slate-200 bg-white p-2 pl-4 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.25)]">

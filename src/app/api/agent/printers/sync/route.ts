@@ -5,7 +5,7 @@ import { connectDB } from "@/lib/mongodb";
 import { Printer } from "@/models/Printer";
 import { Agent } from "@/models/Agent";
 import { getAgentShopId } from "@/lib/agentAuth";
-import { aggregateStatus, HOST_STALE_MS } from "@/lib/printerHosts";
+import { aggregateStatus, HOST_STALE_MS, withVersionRetry } from "@/lib/printerHosts";
 
 export const runtime = "nodejs";
 
@@ -121,36 +121,48 @@ export async function POST(req: NextRequest) {
       // Refresh this computer's entry on every printer it reported.
       const docs = await Printer.find({ shopId, systemPrinterName: { $in: names } });
       for (const doc of docs) {
-        const p = reported.get(doc.systemPrinterName)!;
-        const existing = doc.hosts.find((h) => h.agentId === agent.id);
-        const host = {
-          agentId: agent.id,
-          hostname: agent.hostname,
-          username: agent.username,
-          manufacturer: agent.manufacturer,
-          model: agent.model,
-          port: p.port,
-          portType: p.portType,
-          ipAddress: p.ipAddress,
-          tcpPort: p.tcpPort || undefined,
-          driver: p.driver,
-          // keep the health the heartbeat last reported; a brand-new entry starts as online
-          status: existing?.status ?? "online",
-          lastSeenAt: now,
-        };
-        doc.hosts = [...doc.hosts.filter((h) => h.agentId !== agent.id), host];
-        const agg = aggregateStatus(doc.hosts, now);
-        doc.status = agg.status;
-        doc.lastSeenAt = agg.lastSeenAt ?? now;
-        await doc.save();
+        await withVersionRetry<typeof doc>(
+          async () => Printer.findOne({ _id: doc._id, shopId }),
+          async (latest) => {
+            if (!latest) return;
+            const p = reported.get(latest.systemPrinterName)!;
+            const existing = latest.hosts.find((h) => h.agentId === agent.id);
+            const host = {
+              agentId: agent.id,
+              hostname: agent.hostname,
+              username: agent.username,
+              manufacturer: agent.manufacturer,
+              model: agent.model,
+              port: p.port,
+              portType: p.portType,
+              ipAddress: p.ipAddress,
+              tcpPort: p.tcpPort || undefined,
+              driver: p.driver,
+              // keep the health the heartbeat last reported; a brand-new entry starts as online
+              status: existing?.status ?? "online",
+              lastSeenAt: now,
+            };
+            latest.hosts = [...latest.hosts.filter((h) => h.agentId !== agent.id), host];
+            const agg = aggregateStatus(latest.hosts, now);
+            latest.status = agg.status;
+            latest.lastSeenAt = agg.lastSeenAt ?? now;
+            await latest.save();
+          }
+        );
       }
 
       // Printers this computer no longer has: drop its entry and recompute.
       const gone = await Printer.find({ shopId, systemPrinterName: { $nin: names }, "hosts.agentId": agent.id });
       for (const doc of gone) {
-        doc.hosts = doc.hosts.filter((h) => h.agentId !== agent.id);
-        doc.status = aggregateStatus(doc.hosts, now).status;
-        await doc.save();
+        await withVersionRetry<typeof doc>(
+          async () => Printer.findOne({ _id: doc._id, shopId }),
+          async (latest) => {
+            if (!latest) return;
+            latest.hosts = latest.hosts.filter((h) => h.agentId !== agent.id);
+            latest.status = aggregateStatus(latest.hosts, now).status;
+            await latest.save();
+          }
+        );
       }
 
       // Forget computers that haven't reported for a week (retired PCs).

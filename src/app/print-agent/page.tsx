@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SITE } from "@/components/landing/site";
 import { publicSans } from "@/components/landing/fonts";
 import PoweredBy from "@/components/PoweredBy";
+import InstallGuide from "@/components/InstallGuide";
 
 export const metadata: Metadata = {
   title: `Print Agent for Windows - install and use | ${SITE.name}`,
@@ -11,23 +12,11 @@ export const metadata: Metadata = {
   description: "Download, install and use the QRtoPrint Print Agent on your shop's Windows PC.",
 };
 
-const RELEASES = "https://github.com/Kuldeepsinghrajpoot/QR-printer-agent/releases";
-
 type Step = { t: string; d: string };
 
-const install: Step[] = [
-  { t: "Download the installer", d: "Open the Releases page and, under the newest release (marked Latest), download QRtoPrint-Setup-<version>.exe from Assets. Do not download the Source code files." },
-  { t: "Run the installer", d: "Double-click the file. If Windows shows “Windows protected your PC”, click More info, then Run anyway. This appears because the app is new and not yet widely downloaded." },
-  { t: "Choose where to install", d: "Pick the folder (the default is fine), click Install and wait for it to finish. The app opens by itself at the end." },
-  { t: "Find it later", d: "A QRtoPrint shortcut is added to the Start menu and the desktop. When running, the app also sits in the system tray (bottom right, next to the clock)." },
-];
-
 const setup: Step[] = [
-  { t: "Create the agent key in your dashboard", d: "Log in, open Settings, go to Print Agent and click Create agent key. Copy the key. It is shown only once; if you lose it, create a new one." },
-  { t: "Paste the key into the app", d: "Open the app, go to the Print Agent tab, paste the key under Agent API key and click Add key. The key is then hidden and shows “Key submitted”." },
   { t: "Check the connection", d: "The green dot next to the Print Agent tab and the status at the top show that the agent is connected. Your printers appear under “Printers on this PC” with “Linked to dashboard”." },
   { t: "Set each printer's type", d: "In the dashboard, open Printers and choose B&W, Color or B&W + Color for every printer. The agent shows what Windows detects for each printer so you can match it." },
-  { t: "Turn on Start automatically", d: "On the Print Agent tab, tick “Start automatically when this PC turns on” and click Save & restart agent, so printing resumes after a restart." },
 ];
 
 const usage: Step[] = [
@@ -90,37 +79,17 @@ export default function PrintAgentPage() {
           The Print Agent is a small Windows app that runs on your shop PC. It picks up paid orders from your dashboard and prints them
           on your printers by itself, and tells the dashboard if a printer is offline, jammed or out of paper.
         </p>
-        <a
-          href={RELEASES}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-6 inline-flex items-center rounded-lg bg-brand px-5 py-3 font-semibold text-white hover:opacity-90"
-        >
-          Download for Windows
-        </a>
-        <p className="mt-2 text-sm text-ink/60">Opens the Releases page. Choose the newest release and download the .exe file.</p>
+        <div className="mt-8">
+          <InstallGuide />
+        </div>
 
         <section className="mt-12">
-          <h2 className="font-display text-2xl font-bold">Before you start</h2>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-ink/80">
-            <li>A PC with Windows 10 or Windows 11, switched on during shop hours, with internet.</li>
-            <li>Your printers already installed in Windows (USB, Wi-Fi or network) and able to print a test page.</li>
-            <li>Your shop account on the dashboard (sign up on the home page if you do not have one).</li>
-          </ul>
-        </section>
-
-        <section className="mt-12">
-          <h2 className="font-display text-2xl font-bold">1. Install</h2>
-          <Steps steps={install} />
-        </section>
-
-        <section className="mt-12">
-          <h2 className="font-display text-2xl font-bold">2. Connect it to your shop</h2>
+          <h2 className="font-display text-2xl font-bold">After it connects</h2>
           <Steps steps={setup} />
         </section>
 
         <section className="mt-12">
-          <h2 className="font-display text-2xl font-bold">3. Daily use</h2>
+          <h2 className="font-display text-2xl font-bold">Daily use</h2>
           <Steps steps={usage} />
         </section>
 

@@ -182,7 +182,34 @@ export default function ShopControlsPage() {
           </div>
         </Card>
 
-        {/* Opening hours */}
+      
+
+        {/* Order rules */}
+        <Card>
+          <CardHeader icon={<LineIcon name="files" size={24} />} title="Order rules" subtitle="Keep tiny or huge orders from clogging the queue" />
+          <div className="space-y-4 px-6 pb-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <NumberField label="Minimum order (₹)" value={c.minOrderAmount} onChange={(v) => set("minOrderAmount", v)} helper="0 means no minimum" />
+              <NumberField label="Most pages in one order" value={c.maxPagesPerOrder} onChange={(v) => set("maxPagesPerOrder", Math.round(v))} helper="0 means no limit" />
+              <NumberField label="Most orders waiting at once" value={c.maxActiveOrders} onChange={(v) => set("maxActiveOrders", Math.round(v))} helper="Waiting + printing. 0 means no limit" />
+              <NumberField label="Cancel unpaid cash orders after (min)" value={c.cashAutoCancelMinutes} onChange={(v) => set("cashAutoCancelMinutes", Math.max(1, Math.round(v)))} helper="If the customer never pays at the counter" />
+            </div>
+            <Switch
+              checked={c.showWaitTime !== false}
+              onChange={(v) => set("showWaitTime", v)}
+              title="Show wait time to customers"
+              description={'Customers see "3 orders ahead, about 6 min" before they order and while they track their order.'}
+            />
+            <Switch
+              checked={c.requirePhone}
+              onChange={(v) => set("requirePhone", v)}
+              title="Ask for a mobile number"
+              description="Customers must enter a number, so you can reach them and send the ready message."
+            />
+          </div>
+        </Card>
+
+  {/* Opening hours */}
         <Card>
           <CardHeader
             icon={<LineIcon name="clock" size={24} />}
@@ -245,32 +272,6 @@ export default function ShopControlsPage() {
             )}
           </div>
         </Card>
-
-        {/* Order rules */}
-        <Card>
-          <CardHeader icon={<LineIcon name="files" size={24} />} title="Order rules" subtitle="Keep tiny or huge orders from clogging the queue" />
-          <div className="space-y-4 px-6 pb-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <NumberField label="Minimum order (₹)" value={c.minOrderAmount} onChange={(v) => set("minOrderAmount", v)} helper="0 means no minimum" />
-              <NumberField label="Most pages in one order" value={c.maxPagesPerOrder} onChange={(v) => set("maxPagesPerOrder", Math.round(v))} helper="0 means no limit" />
-              <NumberField label="Most orders waiting at once" value={c.maxActiveOrders} onChange={(v) => set("maxActiveOrders", Math.round(v))} helper="Waiting + printing. 0 means no limit" />
-              <NumberField label="Cancel unpaid cash orders after (min)" value={c.cashAutoCancelMinutes} onChange={(v) => set("cashAutoCancelMinutes", Math.max(1, Math.round(v)))} helper="If the customer never pays at the counter" />
-            </div>
-            <Switch
-              checked={c.showWaitTime !== false}
-              onChange={(v) => set("showWaitTime", v)}
-              title="Show wait time to customers"
-              description={'Customers see "3 orders ahead, about 6 min" before they order and while they track their order.'}
-            />
-            <Switch
-              checked={c.requirePhone}
-              onChange={(v) => set("requirePhone", v)}
-              title="Ask for a mobile number"
-              description="Customers must enter a number, so you can reach them and send the ready message."
-            />
-          </div>
-        </Card>
-
         {/* Customer notice */}
         <Card>
           <CardHeader icon={<LineIcon name="list" size={24} />} title="Message to customers" subtitle="Shown at the top of the upload page" />
