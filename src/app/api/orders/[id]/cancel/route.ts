@@ -60,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const cancelled = await Order.findOneAndUpdate(
       { _id: id, printStatus: "queued" },
       { $set: { printStatus: "cancelled", cancelledAt: new Date(), cancelledBy: "customer" } },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!cancelled) {
       return NextResponse.json(

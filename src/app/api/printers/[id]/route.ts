@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   await connectDB();
-  const printer = await Printer.findOneAndUpdate({ _id: id, shopId: session.shopId }, parsed.data, { new: true });
+  const printer = await Printer.findOneAndUpdate({ _id: id, shopId: session.shopId }, parsed.data, { returnDocument: "after" });
   if (!printer) return NextResponse.json({ error: "Printer not found" }, { status: 404 });
   return NextResponse.json(printer);
 }

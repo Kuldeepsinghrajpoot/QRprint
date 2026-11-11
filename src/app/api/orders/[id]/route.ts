@@ -73,7 +73,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         // sending it back to the printer starts the print story again
         ...(changes.printStatus === "queued" ? { $unset: { readyBy: 1 as const, printerError: 1 as const } } : {}),
       },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });

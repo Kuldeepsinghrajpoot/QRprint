@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
         slug,
         passwordHash: await hashPassword(password),
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
 
     const mail = otpEmail({ name, code, minutes: OTP_TTL_MS / 60000 });

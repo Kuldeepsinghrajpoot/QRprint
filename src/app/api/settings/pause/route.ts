@@ -30,7 +30,7 @@ export async function PATCH(req: NextRequest) {
   let config = await PricingConfig.findOneAndUpdate(
     { shopId: session.shopId },
     { printingPaused: parsed.data.printingPaused },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   if (!config) {

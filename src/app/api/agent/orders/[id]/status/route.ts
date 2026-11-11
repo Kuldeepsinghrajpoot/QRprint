@@ -61,7 +61,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (parsed.data.printStatus === "printing") {
       // Atomic claim: only transition queued -> printing. If another agent
       // already claimed this order, findOneAndUpdate matches nothing here.
-      order = await Order.findOneAndUpdate({ _id: id, shopId, printStatus: "queued" }, update, { new: true });
+      order = await Order.findOneAndUpdate({ _id: id, shopId, printStatus: "queued" }, update, { returnDocument: "after" });
       if (!order) {
         const existing = await Order.findOne({ _id: id, shopId });
         if (!existing) return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -73,7 +73,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     } else {
       // A cancelled order stays cancelled: if the shop cancelled it while it was printing, the agent's later
       // "ready"/"failed" report must not bring it back (or send a "ready" message to the customer).
-      order = await Order.findOneAndUpdate({ _id: id, shopId, printStatus: { $ne: "cancelled" } }, update, { new: true });
+      order = await Order.findOneAndUpdate(
+        { _id: id, shopId, printStatus: { $ne: "cancelled" } },
+        update,
+        { returnDocument: "after" }
+      );
       if (!order) {
         const existing = await Order.findOne({ _id: id, shopId });
         if (!existing) return NextResponse.json({ error: "Order not found" }, { status: 404 });

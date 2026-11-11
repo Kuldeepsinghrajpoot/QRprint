@@ -77,7 +77,7 @@ export async function PUT(req: NextRequest) {
     // Free printing and paid methods are exclusive: when free printing is on, Cash and Online are forced off.
     const update = parsed.data.freePrinting ? { ...parsed.data, cashPaymentEnabled: false, onlinePaymentEnabled: false } : parsed.data;
     const config = await PricingConfig.findOneAndUpdate({ shopId: session.shopId }, { $set: update }, {
-      new: true,
+      returnDocument: "after",
       upsert: true,
     });
     return NextResponse.json(config);

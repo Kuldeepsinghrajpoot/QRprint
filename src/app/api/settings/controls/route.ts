@@ -92,7 +92,7 @@ export async function PATCH(req: NextRequest) {
     const config = await PricingConfig.findOneAndUpdate(
       { shopId: session.shopId },
       { $set: parsed.data, $setOnInsert: { shopName: "My Print Shop", rates: DEFAULT_RATES } },
-      { new: true, upsert: true }
+      { returnDocument: "after", upsert: true }
     );
     return NextResponse.json(pick(config.toObject()));
   } catch (err) {
