@@ -279,7 +279,7 @@ export default function CustomerPage() {
         : !free && config.minOrderAmount && price && price.total < config.minOrderAmount
           ? `The minimum order is ₹${config.minOrderAmount}.`
           : "";
-  const canContinue = name.trim().length > 0 && !!file && pages > 0 && !detecting && !!config && hours.open && !noPayment && !nothingOffered && !ruleMessage;
+  const canContinue = name.trim().length > 0 && !!file && pages > 0 && !detecting && !!config && shopOnline === true && hours.open && !noPayment && !nothingOffered && !ruleMessage;
   const showDuplexTip = pages > 4 && !duplex && paperSize === "A4";
 
   async function loadFile(f: File) {
@@ -510,8 +510,12 @@ export default function CustomerPage() {
               }`} />
               {shopOnline === null ? "Shop status unavailable" : shopOnline ? "Shop online" : "Shop offline"}
             </div>
-            {shopOnline === false && (
-              <p className="mt-1 text-[11px] text-slate-500">You can still place an order, but printing may be delayed.</p>
+            {shopOnline !== true && (
+              <p className="mt-1 text-[11px] text-slate-500">
+                {shopOnline === false
+                  ? "This shop is offline and isn't accepting orders right now."
+                  : "Shop status is unavailable, so orders are temporarily disabled."}
+              </p>
             )}
           </div>
         </header>
@@ -819,7 +823,7 @@ export default function CustomerPage() {
                 <a href={`${policyBase}/terms`} target="_blank" rel="noopener noreferrer" className="underline">Terms</a> and the{" "}
                 <a href={`${policyBase}/refund-policy`} target="_blank" rel="noopener noreferrer" className="underline">Refund &amp; Cancellation Policy</a>.
               </p>
-              <button disabled={!method || submitting || config.printingPaused || noPayment} onClick={handlePay} className="btn-primary">
+              <button disabled={!method || submitting || config.printingPaused || noPayment || shopOnline !== true} onClick={handlePay} className="btn-primary">
                 Pay Now
               </button>
               <button onClick={() => setStep("upload")} className="btn-secondary">

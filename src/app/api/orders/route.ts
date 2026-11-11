@@ -16,6 +16,7 @@ import { getSession } from "@/lib/session";
 import { publicUrlForKey } from "@/lib/storage";
 import { resolveShopId } from "@/lib/shop";
 import { newCancelKey, hashCancelKey } from "@/lib/cancelKey";
+import { isShopOnline } from "@/lib/shopStatus";
 
 export const runtime = "nodejs";
 
@@ -120,6 +121,12 @@ export async function POST(req: NextRequest) {
     const shopId = await resolveShopId(data.shop);
     if (!shopId) {
       return NextResponse.json({ error: "Shop not found — please scan the shop QR code again" }, { status: 404 });
+    }
+    if (!(await isShopOnline(shopId))) {
+      return NextResponse.json(
+        { error: "This shop is offline and isn't accepting orders right now. Please try again later." },
+        { status: 503 },
+      );
     }
 
     let config = await PricingConfig.findOne({ shopId });

@@ -8,6 +8,7 @@ import { Order } from "@/models/Order";
 import { PricingConfig } from "@/models/PricingConfig";
 import { resolveShopId } from "@/lib/shop";
 import { shopOpenStatus } from "@/lib/shopHours";
+import { isShopOnline } from "@/lib/shopStatus";
 
 export const runtime = "nodejs";
 
@@ -41,6 +42,15 @@ export async function POST(req: NextRequest) {
     // Don't take money for an order the shop would refuse anyway (closed, or too many orders waiting).
     await connectDB();
     const shopId = await resolveShopId(parsed.data.shop);
+    if (!shopId) {
+      return NextResponse.json({ error: "Shop not found — please scan the shop QR code again" }, { status: 404 });
+    }
+    if (!(await isShopOnline(shopId))) {
+      return NextResponse.json(
+        { error: "This shop is offline and isn't accepting orders right now. Please try again later." },
+        { status: 503 },
+      );
+    }
     const gateway = await getGateway(shopId);
     if (!gateway) {
       return NextResponse.json({ error: "Online payment is not set up for this shop", configured: false }, { status: 501 });
