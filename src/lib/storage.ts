@@ -188,7 +188,15 @@ export async function deleteFile(key: string): Promise<void> {
       method: "DELETE",
       headers: { ...sbAuthHeaders() },
     });
-    if (!res.ok && res.status !== 404) throw new Error(`Supabase delete failed: ${await supabaseErrorMessage(res)}`);
+    if (!res.ok && res.status !== 404) {
+      const body = (await res.json().catch(() => null)) as
+        | { message?: string; error?: string; statusCode?: string | number }
+        | null;
+      const message = body?.message || body?.error || `HTTP ${res.status}`;
+      if (String(body?.statusCode ?? "") !== "404" && message !== "Object not found") {
+        throw new Error(`Supabase delete failed: ${message}`);
+      }
+    }
     return;
   }
   const full = localPath(key);
