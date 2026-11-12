@@ -40,10 +40,17 @@ export default function AdminTopBar({
       }
     }
     load();
-    const t = setInterval(load, 10000);
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 60000);
+    const refreshOnReturn = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", refreshOnReturn);
     return () => {
       alive = false;
       clearInterval(t);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
     };
   }, []);
 

@@ -26,7 +26,6 @@ interface Controls {
   maxPagesPerOrder: number;
   maxActiveOrders: number;
   showWaitTime: boolean;
-  requirePhone: boolean;
   customerNotice: string;
   cashAutoCancelMinutes: number;
 }
@@ -200,12 +199,7 @@ export default function ShopControlsPage() {
               title="Show wait time to customers"
               description={'Customers see "3 orders ahead, about 6 min" before they order and while they track their order.'}
             />
-            <Switch
-              checked={c.requirePhone}
-              onChange={(v) => set("requirePhone", v)}
-              title="Ask for a mobile number"
-              description="Customers must enter a number, so you can reach them and send the ready message."
-            />
+            <p className="text-sm text-slate-500">A valid mobile number is required for every customer order.</p>
           </div>
         </Card>
 

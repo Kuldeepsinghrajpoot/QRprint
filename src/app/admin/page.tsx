@@ -6,7 +6,8 @@ import LineIcon from "@/components/lexical/LineIcon";
 import { CANCEL_WINDOW_MS } from "@/lib/orderTiming";
 import { Alert, Avatar, Button, Card, Chip, StatCard, Switch, type Tone } from "@/components/lexical/ui";
 
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 15000;
+const AUX_POLL_INTERVAL_MS = 60000;
 
 const STATUS_FILTERS: { key: string; label: string }[] = [
   { key: "", label: "All" },
@@ -137,10 +138,27 @@ export default function AdminQueuePage() {
     fetchPrinters();
     fetchConfig();
     const interval = setInterval(() => {
-      fetchOrders();
-      fetchConfig();
+      if (document.visibilityState === "visible") fetchOrders();
     }, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
+    const auxInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchPrinters();
+        fetchConfig();
+      }
+    }, AUX_POLL_INTERVAL_MS);
+    const refreshOnReturn = () => {
+      if (document.visibilityState === "visible") {
+        fetchOrders();
+        fetchPrinters();
+        fetchConfig();
+      }
+    };
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    return () => {
+      clearInterval(interval);
+      clearInterval(auxInterval);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+    };
   }, [fetchOrders, fetchPrinters, fetchConfig]);
 
   // remember the alert switch on this device

@@ -8,7 +8,7 @@ import { serverError } from "@/lib/apiError";
 
 export const runtime = "nodejs";
 
-const MAX_STAFF = 10;
+const MAX_STAFF = 3;
 
 const createSchema = z.object({
   name: z.string().trim().min(1, "Enter a name").max(60),

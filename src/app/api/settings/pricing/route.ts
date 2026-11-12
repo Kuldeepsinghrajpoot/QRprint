@@ -38,7 +38,6 @@ const pricingSchema = z
     clearFreePrintingPassword: z.boolean().optional(),
     cashPaymentEnabled: z.boolean(),
     onlinePaymentEnabled: z.boolean(),
-    printingPaused: z.boolean(),
   })
   .partial();
 

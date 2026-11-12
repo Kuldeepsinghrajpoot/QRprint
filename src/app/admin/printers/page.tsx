@@ -65,8 +65,17 @@ export default function PrintersPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load
     load();
-    const interval = setInterval(load, 5000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 30000);
+    const refreshOnReturn = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+    };
   }, [load]);
 
   // Esc closes whichever dialog is open

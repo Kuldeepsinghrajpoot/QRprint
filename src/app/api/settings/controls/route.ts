@@ -32,7 +32,6 @@ const controlsSchema = z
     maxPagesPerOrder: z.number().int().min(0).max(2000),
     maxActiveOrders: z.number().int().min(0).max(1000),
     showWaitTime: z.boolean(),
-    requirePhone: z.boolean(),
     customerNotice: z.string().trim().max(200),
     cashAutoCancelMinutes: z.number().int().min(1).max(1440),
   })
@@ -41,7 +40,7 @@ const controlsSchema = z
 
 const FIELDS = [
   "autoPrint", "defaultColorPrinterId", "defaultBwPrinterId", "openingHoursEnabled", "openTime", "closeTime", "openDays", "timezone", "minOrderAmount",
-  "maxPagesPerOrder", "maxActiveOrders", "showWaitTime", "requirePhone", "customerNotice", "cashAutoCancelMinutes", "printingPaused",
+  "maxPagesPerOrder", "maxActiveOrders", "showWaitTime", "customerNotice", "cashAutoCancelMinutes", "printingPaused",
 ] as const;
 
 const pick = (c: object | null) => Object.fromEntries(FIELDS.map((k) => [k, (c as Record<string, unknown> | null)?.[k]]));

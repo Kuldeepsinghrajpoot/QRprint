@@ -15,7 +15,7 @@ interface Member {
 /** Settings card (owner only): add, remove and reset passwords for staff logins. */
 export default function TeamCard() {
   const [members, setMembers] = useState<Member[]>([]);
-  const [max, setMax] = useState(10);
+  const [max, setMax] = useState(3);
   const [adding, setAdding] = useState(false);
   const [resetFor, setResetFor] = useState<Member | null>(null);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
@@ -87,7 +87,7 @@ export default function TeamCard() {
 
   return (
     <Card>
-      <CardHeader icon={<LineIcon name="users" size={24} />} title="Team" subtitle="Staff logins for your counter. Staff can run the queue but cannot open settings or mark refunds." />
+      <CardHeader icon={<LineIcon name="users" size={24} />} title="Team" subtitle="Up to 3 staff logins for your counter. Staff can run the queue but cannot open settings or mark refunds." />
       <div className="space-y-3 px-6 pb-6">
         {notice && <Alert tone="success" icon="✅">{notice}</Alert>}
         {error && !adding && !resetFor && <Alert tone="error" icon="⚠️">{error}</Alert>}

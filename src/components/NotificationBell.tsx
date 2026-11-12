@@ -7,7 +7,7 @@ import { Chip } from "@/components/lexical/ui";
 import type { OrderDTO } from "@/types/order";
 
 const SEEN_KEY = "qrprint_bell_seen";
-const POLL_MS = 5000;
+const POLL_MS = 30000;
 
 const localToday = () => {
   const d = new Date();
@@ -60,8 +60,17 @@ export default function NotificationBell() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- polling an external API
     load();
-    const t = setInterval(load, POLL_MS);
-    return () => clearInterval(t);
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, POLL_MS);
+    const refreshOnReturn = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+    };
   }, [load]);
 
   useEffect(() => {

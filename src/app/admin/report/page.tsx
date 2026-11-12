@@ -10,7 +10,13 @@ const parseISO = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d);
 };
-const fmtDay = (iso: string) => parseISO(iso).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const formatISODate = (iso: string, options: Intl.DateTimeFormatOptions) => {
+  if (!iso) return "";
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", { ...options, timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, day)));
+};
+const fmtDay = (iso: string) => formatISODate(iso, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const fmtShortDay = (iso: string) => formatISODate(iso, { weekday: "short", day: "numeric", month: "short" });
 const hour12 = (h: number) => `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? "AM" : "PM"}`;
 const field =
   "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900/80 outline-none transition focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)]";
@@ -33,12 +39,19 @@ function ToolCard({ icon, label, children }: { icon: React.ReactNode; label: str
 }
 
 export default function DailyReportPage() {
-  const [date, setDate] = useState(() => localISO(new Date()));
+  const [dates, setDates] = useState({ date: "", today: "" });
+  const { date, today } = dates;
+  const setDate = (nextDate: string) => setDates((current) => ({ ...current, date: nextDate }));
   const [orders, setOrders] = useState<OrderDTO[] | null>(null);
   const [shopName, setShopName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const today = localISO(new Date());
+
+  useEffect(() => {
+    const currentToday = localISO(new Date());
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initialize the browser-local day after hydration
+    setDates({ date: currentToday, today: currentToday });
+  }, []);
 
   useEffect(() => {
     fetch("/api/settings/pricing", { cache: "no-store" })
@@ -49,6 +62,7 @@ export default function DailyReportPage() {
 
   useEffect(() => {
     let alive = true;
+    if (!date) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- show the loading state while the new day loads
     setOrders(null);
     fetch(`/api/orders?date=${date}&tz=${new Date().getTimezoneOffset()}`, { cache: "no-store" })
@@ -70,7 +84,8 @@ export default function DailyReportPage() {
   }, [date]);
 
   // counted cash is a per-browser convenience, remembered per day (empty if storage is blocked)
-  const [counts, setCounts] = useState<Record<string, string>>(() => {
+  const [counts, setCounts] = useState<Record<string, string>>({});
+  useEffect(() => {
     const out: Record<string, string> = {};
     try {
       for (let i = 0; i < localStorage.length; i++) {
@@ -80,8 +95,9 @@ export default function DailyReportPage() {
     } catch {
       /* storage unavailable */
     }
-    return out;
-  });
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restore browser-only cash counts after hydration
+    setCounts(out);
+  }, []);
   const counted = counts[date] ?? "";
 
   function updateCounted(v: string) {
@@ -129,6 +145,7 @@ export default function DailyReportPage() {
   }, [orders]);
 
   function shift(days: number) {
+    if (!date) return;
     const d = parseISO(date);
     d.setDate(d.getDate() + days);
     const next = localISO(d);
@@ -173,7 +190,7 @@ export default function DailyReportPage() {
             <Button variant="outlined" size="sm" onClick={() => shift(-1)} aria-label="Previous day">
               ‹
             </Button>
-            <input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Report date" className={`${field} min-w-0 flex-1`} />
+            <input type="date" value={date} max={today || undefined} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Report date" className={`${field} min-w-0 flex-1`} />
             <Button variant="outlined" size="sm" onClick={() => shift(1)} disabled={date >= today} aria-label="Next day">
               ›
             </Button>
@@ -182,7 +199,7 @@ export default function DailyReportPage() {
 
         <ToolCard icon={<LineIcon name="clock" size={20} />} label="Today">
           <div className="flex items-center justify-between gap-2">
-            <span className="whitespace-nowrap text-sm font-semibold text-slate-900/90">{parseISO(today).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
+            <span className="whitespace-nowrap text-sm font-semibold text-slate-900/90">{today ? fmtShortDay(today) : "—"}</span>
             <Button variant="outlined" size="sm" className="shrink-0 whitespace-nowrap" onClick={() => setDate(today)} disabled={date === today}>
               {date === today ? "Showing today" : "Go to today"}
             </Button>
@@ -288,7 +305,7 @@ export default function DailyReportPage() {
                   <span className="text-slate-900/60">Cash you counted</span>
                   <span className="flex items-center gap-1">
                     <span className="text-slate-900/60">₹</span>
-                    <input inputMode="numeric" value={counted} onChange={(e) => updateCounted(e.target.value)} placeholder="0" aria-label="Cash counted" className={`${field} w-28 text-right tabular-nums`} />
+                    <input inputMode="numeric" value={counted} onChange={(e) => updateCounted(e.target.value)} placeholder="0" aria-label="Cash counted" disabled={!date} className={`${field} w-28 text-right tabular-nums`} />
                   </span>
                 </label>
                 {counted !== "" && (

@@ -8,7 +8,7 @@ import AgentKeyBox from "@/components/AgentKeyBox";
 import PaymentGatewayCard from "@/components/PaymentGatewayCard";
 import TeamCard from "@/components/TeamCard";
 import ChangePasswordCard from "@/components/ChangePasswordCard";
-import { Alert, Button, Card, CardHeader, Switch, TextField } from "@/components/lexical/ui";
+import { Alert, Button, Card, CardHeader, TextField } from "@/components/lexical/ui";
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<PricingConfigDTO | null>(null);
@@ -262,25 +262,9 @@ export default function SettingsPage() {
         {/* Online payments: the shop's own gateway keys (Razorpay, PhonePe or Paytm - one active at a time) */}
         <PaymentGatewayCard />
 
-        {/* Queue control */}
-        <Card>
-          <CardHeader icon={<LineIcon name="hour" size={24} />} title="Queue Control" subtitle="Lunch break or printer maintenance" />
-          <div className="space-y-3 px-6 pb-6">
-            <Switch
-              checked={config.printingPaused}
-              onChange={(v) => setConfig({ ...config, printingPaused: v })}
-              title="⏸️ Pause printing"
-              description="Blocks new orders and holds the queue until you resume"
-            />
-            <p className="text-xs text-slate-900/50">
-              There&apos;s also a quick toggle for this right on the Live Queue page — no need to come here just to pause.
-            </p>
-          </div>
-        </Card>
+        <TeamCard />
         <ChangePasswordCard />
       </div>
-
-      <TeamCard />
 
       {/* Sticky save bar */}
       <div className="sticky bottom-4 z-20">

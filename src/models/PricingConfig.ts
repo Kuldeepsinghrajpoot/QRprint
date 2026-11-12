@@ -59,7 +59,6 @@ export interface IPricingConfig extends Document {
   maxPagesPerOrder: number; // 0 = no limit
   maxActiveOrders: number; // waiting + printing orders at once, 0 = no limit
   showWaitTime: boolean; // customers see "N orders ahead, about X min" on the order and tracking pages
-  requirePhone: boolean; // customer must enter a mobile number
   customerNotice: string; // short message shown at the top of the customer page
   cashAutoCancelMinutes: number; // unpaid cash orders are cancelled after this many minutes
 
@@ -135,7 +134,6 @@ const PricingConfigSchema = new Schema<IPricingConfig>(
     maxPagesPerOrder: { type: Number, default: 0 },
     maxActiveOrders: { type: Number, default: 0 },
     showWaitTime: { type: Boolean, default: true },
-    requirePhone: { type: Boolean, default: false },
     customerNotice: { type: String, default: "" },
     cashAutoCancelMinutes: { type: Number, default: 20 },
   },

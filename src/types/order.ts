@@ -90,7 +90,6 @@ export interface PricingConfigDTO {
   maxPagesPerOrder?: number;
   maxActiveOrders?: number;
   showWaitTime?: boolean;
-  requirePhone?: boolean;
   customerNotice?: string;
   cashAutoCancelMinutes?: number;
 }

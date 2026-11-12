@@ -2,6 +2,7 @@
 
 import { LEX_FONT, PAGE_BG } from "@/components/lexical/ui";
 import { shopOpenStatus } from "@/lib/shopHours";
+import { isValidMobileNumber } from "@/lib/mobileNumber";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { slugFromHostname } from "@/lib/shopUrl";
 import Link from "next/link";
@@ -113,11 +114,18 @@ export default function CustomerPage() {
     }
 
     const first = setTimeout(loadShopStatus, 400);
-    const interval = setInterval(loadShopStatus, 15000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") loadShopStatus();
+    }, 30000);
+    const refreshOnReturn = () => {
+      if (document.visibilityState === "visible") loadShopStatus();
+    };
+    document.addEventListener("visibilitychange", refreshOnReturn);
     return () => {
       stop = true;
       clearTimeout(first);
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
     };
   }, []);
 
@@ -135,11 +143,18 @@ export default function CustomerPage() {
       }
     }
     const first = setTimeout(load, 400); // after the shop has been worked out from the address
-    const t = setInterval(load, 30000);
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 60000);
+    const refreshOnReturn = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", refreshOnReturn);
     return () => {
       stop = true;
       clearTimeout(first);
       clearInterval(t);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
     };
   }, []);
 
@@ -270,11 +285,11 @@ export default function CustomerPage() {
       setPrintType(next.printType);
     }
   }, [config, paperSize, printType]);
-  const phoneOk = /^\+?[0-9][0-9 -]{6,18}$/.test(phone.trim());
+  const phoneOk = isValidMobileNumber(phone);
   const ruleMessage = !config || !file || pages <= 0
     ? ""
-    : config.requirePhone && !phoneOk
-      ? "Enter your mobile number to continue."
+    : !phoneOk
+      ? "Enter a valid mobile number to continue."
       : config.maxPagesPerOrder && pages > config.maxPagesPerOrder
         ? `This shop takes up to ${config.maxPagesPerOrder} pages per order. Please split your file.`
         : free && freePrintingPassword.length < 8
@@ -282,7 +297,7 @@ export default function CustomerPage() {
         : !free && config.minOrderAmount && price && price.total < config.minOrderAmount
           ? `The minimum order is ₹${config.minOrderAmount}.`
           : "";
-  const canContinue = name.trim().length > 0 && !!file && pages > 0 && !detecting && !!config && shopOnline === true && hours.open && !noPayment && !nothingOffered && !ruleMessage;
+  const canContinue = name.trim().length > 0 && phoneOk && !!file && pages > 0 && !detecting && !!config && shopOnline === true && hours.open && !noPayment && !nothingOffered && !ruleMessage;
   const showDuplexTip = pages > 4 && !duplex && paperSize === "A4";
 
   async function loadFile(f: File) {
@@ -568,8 +583,8 @@ export default function CustomerPage() {
                 <Field label="Apna naam likhein">
                   <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ayush" className="input" />
                 </Field>
-                <Field label={config?.requirePhone ? "Mobile number" : "Mobile number (optional)"}>
-                  <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98XXXXXXXX" className="input" />
+                <Field label="Mobile number (required)">
+                  <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98XXXXXXXX" autoComplete="tel" required className="input" />
                 </Field>
               </div>
 

@@ -18,6 +18,7 @@ import { resolveShopId } from "@/lib/shop";
 import { newCancelKey, hashCancelKey } from "@/lib/cancelKey";
 import { isShopOnline } from "@/lib/shopStatus";
 import { verifyPassword } from "@/lib/auth";
+import { isValidMobileNumber } from "@/lib/mobileNumber";
 
 export const runtime = "nodejs";
 
@@ -142,12 +143,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "The shop is not accepting orders right now" }, { status: 503 });
     }
 
-    // Shop Controls: opening hours, order limits, phone requirement, waiting-order cap
+    // Shop Controls: opening hours, order limits, waiting-order cap
     const hours = shopOpenStatus(config);
     if (!hours.open) {
       return NextResponse.json({ error: hours.message }, { status: 503 });
     }
-    if (config.requirePhone && !/^\+?[0-9][0-9 -]{6,18}$/.test(data.customerPhone || "")) {
+    if (!isValidMobileNumber(data.customerPhone || "")) {
       return NextResponse.json({ error: "Please enter a valid mobile number" }, { status: 400 });
     }
     if (config.maxPagesPerOrder > 0 && data.pages > config.maxPagesPerOrder) {
