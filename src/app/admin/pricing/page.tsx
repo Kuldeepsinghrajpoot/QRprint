@@ -164,7 +164,7 @@ export default function PricingPage() {
         {/* Extra charges */}
         <div>
           <Card className="h-full">
-            <CardHeader icon={<LineIcon name="wallet" size={24} />} title="Discounts & Extra Charges" subtitle="Duplex, rush, binding and lamination" />
+            <CardHeader icon={<LineIcon name="wallet" size={24} />} title="Discounts & Extra Charges" subtitle="Duplex discount starts on page 2; page 1 stays full price" />
             <div className="grid grid-cols-1 gap-5 px-6 pb-6 sm:grid-cols-2">
               <NumberField label="Duplex discount (%)" value={config.duplexDiscountPercent} onChange={(v) => setConfig({ ...config, duplexDiscountPercent: v })} />
               <NumberField label="Priority / rush fee (%)" value={config.priorityFeePercent} onChange={(v) => setConfig({ ...config, priorityFeePercent: v })} />
