@@ -37,6 +37,7 @@ export interface IPricingConfig extends Document {
   onlineFeeGstPercent: number; // GST on the fee itself, e.g. 18
 
   freePrinting: boolean; // no payment at all (college / office): orders go straight to the queue and earn no revenue
+  freePrintingPasswordHash: string;
   cashPaymentEnabled: boolean;
   onlinePaymentEnabled: boolean;
 
@@ -116,6 +117,7 @@ const PricingConfigSchema = new Schema<IPricingConfig>(
     onlineFeeGstPercent: { type: Number, default: 18 },
 
     freePrinting: { type: Boolean, default: false },
+    freePrintingPasswordHash: { type: String, default: "", select: false },
     cashPaymentEnabled: { type: Boolean, default: true },
     onlinePaymentEnabled: { type: Boolean, default: true },
 

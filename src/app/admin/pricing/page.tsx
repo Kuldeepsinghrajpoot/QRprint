@@ -15,6 +15,8 @@ export default function PricingPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [freePrintingPassword, setFreePrintingPassword] = useState("");
+  const [clearFreePrintingPassword, setClearFreePrintingPassword] = useState(false);
   const load = useCallback(async () => {
     const res = await fetch("/api/settings/pricing", { cache: "no-store" });
     setConfig(await res.json());
@@ -48,6 +50,10 @@ export default function PricingPage() {
 
   async function handleSave() {
     if (!config) return;
+    if (freePrintingPassword && (freePrintingPassword.length < 8 || freePrintingPassword.length > 72)) {
+      setError("Free printing passwords must be 8–72 characters.");
+      return;
+    }
     setSaving(true);
     setError(null);
     setSaved(false);
@@ -55,11 +61,19 @@ export default function PricingPage() {
       const res = await fetch("/api/settings/pricing", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...config, gstEnabled: false, onlineFeeEnabled: false }), // GST and the online fee are no longer offered, so saving switches them off
+        body: JSON.stringify({
+          ...config,
+          gstEnabled: false,
+          onlineFeeEnabled: false,
+          ...(freePrintingPassword ? { freePrintingPassword } : {}),
+          ...(clearFreePrintingPassword ? { clearFreePrintingPassword: true } : {}),
+        }), // GST and the online fee are no longer offered, so saving switches them off
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save");
       setConfig(data);
+      setFreePrintingPassword("");
+      setClearFreePrintingPassword(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
@@ -178,8 +192,49 @@ export default function PricingPage() {
                 }
               }}
               title="Free printing (no payment)"
-              description="For colleges and offices: customers just upload and send. No payment step, no revenue."
+              description="For colleges and offices: customers enter the shared password to send a free order."
             />
+            {(config.freePrinting || config.freePrintingPasswordSet) && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <label htmlFor="free-printing-password" className="block text-sm font-semibold text-slate-900/90">
+                  Free printing password
+                </label>
+                <input
+                  id="free-printing-password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  maxLength={72}
+                  value={freePrintingPassword}
+                  onChange={(e) => {
+                    setFreePrintingPassword(e.target.value);
+                    setClearFreePrintingPassword(false);
+                  }}
+                  placeholder={config.freePrintingPasswordSet ? "Enter a new password to change it" : "Set a password (8–72 characters)"}
+                  className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent)]/20"
+                />
+                <p className="mt-2 text-xs text-slate-600">
+                  {clearFreePrintingPassword
+                    ? "The saved password will be removed when you save."
+                    : config.freePrintingPasswordSet
+                      ? "A password is saved. Leave this blank to keep it."
+                      : "Set a password before saving free printing. Give it only to people allowed to print for free."}
+                </p>
+                {config.freePrintingPasswordSet && (
+                  <button
+                    type="button"
+                    disabled={!!config.freePrinting}
+                    onClick={() => {
+                      setFreePrintingPassword("");
+                      setClearFreePrintingPassword(true);
+                    }}
+                    className="mt-3 text-xs font-semibold text-red-700 underline underline-offset-2 disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+                  >
+                    Remove saved password
+                  </button>
+                )}
+              </div>
+            )}
             <Switch checked={!config.freePrinting && config.cashPaymentEnabled} onChange={(v) => setConfig({ ...config, cashPaymentEnabled: v })} title="Accept Cash payments" description={config.freePrinting ? "Off while free printing is on" : "Customer pays at the counter"} disabled={!!config.freePrinting} />
             <Switch checked={!config.freePrinting && config.onlinePaymentEnabled} onChange={(v) => setConfig({ ...config, onlinePaymentEnabled: v })} title="Accept Online (UPI/Card) payments" description={config.freePrinting ? "Off while free printing is on" : "Checkout through your active gateway (Razorpay, PhonePe or Paytm: Settings → Online payments)"} disabled={!!config.freePrinting} />
             {!config.freePrinting && !config.cashPaymentEnabled && !config.onlinePaymentEnabled && (

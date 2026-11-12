@@ -37,11 +37,12 @@ export default function CustomerPage() {
   const [printType, setPrintType] = useState<PrintType>("bw");
   const [paperSize, setPaperSize] = useState<PaperSize>("A4");
   const [duplex, setDuplex] = useState(false);
-  const [duplexEdge, setDuplexEdge] = useState<DuplexEdge>("long");
+  const duplexEdge: DuplexEdge = "long";
   const [pagesPerSheet, setPagesPerSheet] = useState<number>(1);
   const [binding, setBinding] = useState<BindingType>("none");
   const [priority, setPriority] = useState(false);
   const [copies, setCopies] = useState(1);
+  const [freePrintingPassword, setFreePrintingPassword] = useState("");
   const [detecting, setDetecting] = useState(false);
   // PDF preview popup and the page range the customer chose in it (null = every page)
   const [showPreview, setShowPreview] = useState(false);
@@ -276,6 +277,8 @@ export default function CustomerPage() {
       ? "Enter your mobile number to continue."
       : config.maxPagesPerOrder && pages > config.maxPagesPerOrder
         ? `This shop takes up to ${config.maxPagesPerOrder} pages per order. Please split your file.`
+        : free && freePrintingPassword.length < 8
+          ? "Enter the free printing password provided by the shop (at least 8 characters)."
         : !free && config.minOrderAmount && price && price.total < config.minOrderAmount
           ? `The minimum order is ₹${config.minOrderAmount}.`
           : "";
@@ -394,6 +397,7 @@ export default function CustomerPage() {
         copies,
         priority,
         paymentMethod: method,
+        freePrintingPassword: method === "free" ? freePrintingPassword : undefined,
         ...paymentProof,
       }),
     });
@@ -469,6 +473,7 @@ export default function CustomerPage() {
     setBinding("none");
     setPriority(false);
     setCopies(1);
+    setFreePrintingPassword("");
     setMethod(null);
     setOrder(null);
     setError(null);
@@ -567,6 +572,22 @@ export default function CustomerPage() {
                   <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98XXXXXXXX" className="input" />
                 </Field>
               </div>
+
+              {free && (
+                <Field label="Free printing password">
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={freePrintingPassword}
+                    onChange={(e) => setFreePrintingPassword(e.target.value)}
+                    minLength={8}
+                    maxLength={72}
+                    placeholder="Enter the password provided by the shop"
+                    className="input"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-500">The shop requires this password to accept free print orders.</p>
+                </Field>
+              )}
 
               {!file && (
                 <Field label="Your file">

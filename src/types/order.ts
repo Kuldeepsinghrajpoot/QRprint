@@ -73,6 +73,7 @@ export interface PricingConfigDTO {
   onlineFeePercent?: number;
   onlineFeeGstPercent?: number;
   freePrinting?: boolean;
+  freePrintingPasswordSet?: boolean;
   cashPaymentEnabled: boolean;
   onlinePaymentEnabled: boolean;
   printingPaused: boolean;

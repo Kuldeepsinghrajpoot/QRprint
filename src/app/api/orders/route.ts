@@ -17,6 +17,7 @@ import { publicUrlForKey } from "@/lib/storage";
 import { resolveShopId } from "@/lib/shop";
 import { newCancelKey, hashCancelKey } from "@/lib/cancelKey";
 import { isShopOnline } from "@/lib/shopStatus";
+import { verifyPassword } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -39,6 +40,7 @@ const createOrderSchema = z.object({
   copies: z.number().int().min(1).max(50),
   priority: z.boolean().default(false),
   paymentMethod: z.enum(["cash", "online", "free"]),
+  freePrintingPassword: z.string().max(72).optional(),
   // Present only for real online payments (omitted in simulated/test-mode flow).
   // Razorpay sends its three fields; PhonePe and Paytm send the gatewayOrderId the server gave them. The server re-checks all of it with the gateway.
   paymentProvider: z.enum(["razorpay", "phonepe", "paytm"]).optional(),
@@ -129,7 +131,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let config = await PricingConfig.findOne({ shopId });
+    let config = await PricingConfig.findOne({ shopId }).select("+freePrintingPasswordHash");
     if (!config) {
       config = await PricingConfig.create({ shopId, shopName: "My Print Shop", rates: DEFAULT_RATES });
     }
@@ -161,6 +163,14 @@ export async function POST(req: NextRequest) {
     // Free printing (college / office): no payment at all. The order is marked paid with a total of 0 so it goes
     // straight to the queue and never counts as revenue or cash to collect.
     const free = config.freePrinting === true;
+    if (free) {
+      if (!config.freePrintingPasswordHash) {
+        return NextResponse.json({ error: "Free printing is unavailable until the shop sets its password." }, { status: 503 });
+      }
+      if (!data.freePrintingPassword || !(await verifyPassword(data.freePrintingPassword, config.freePrintingPasswordHash))) {
+        return NextResponse.json({ error: "The free printing password is incorrect." }, { status: 403 });
+      }
+    }
     if (data.paymentMethod === "free" && !free) {
       return NextResponse.json({ error: "This shop is not offering free printing" }, { status: 400 });
     }

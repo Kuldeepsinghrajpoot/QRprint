@@ -5,6 +5,7 @@ import { PricingConfig, DEFAULT_RATES } from "@/models/PricingConfig";
 import { getSession } from "@/lib/session";
 import { z } from "zod";
 import { resolveShopId } from "@/lib/shop";
+import { hashPassword } from "@/lib/auth";
 
 const tier = z.object({
   page1: z.number().min(0).max(100000),
@@ -33,6 +34,8 @@ const pricingSchema = z
     onlineFeePercent: z.number().min(0).max(10),
     onlineFeeGstPercent: z.number().min(0).max(100),
     freePrinting: z.boolean(),
+    freePrintingPassword: z.string().min(8).max(72).optional(),
+    clearFreePrintingPassword: z.boolean().optional(),
     cashPaymentEnabled: z.boolean(),
     onlinePaymentEnabled: z.boolean(),
     printingPaused: z.boolean(),
@@ -40,6 +43,15 @@ const pricingSchema = z
   .partial();
 
 export const runtime = "nodejs";
+
+function pricingResponse(config: Awaited<ReturnType<typeof PricingConfig.findOne>>, includePasswordStatus = false) {
+  if (!config) throw new Error("Pricing configuration was not saved");
+  const { freePrintingPasswordHash, ...safeConfig } = config.toObject();
+  return {
+    ...safeConfig,
+    ...(includePasswordStatus ? { freePrintingPasswordSet: Boolean(freePrintingPasswordHash) } : {}),
+  };
+}
 
 /** GET /api/settings/pricing — public (customer page needs this to calculate live prices) */
 export async function GET(req: NextRequest) {
@@ -51,13 +63,14 @@ export async function GET(req: NextRequest) {
   if (!shopId) {
     return NextResponse.json({ error: "Shop not found" }, { status: 404 });
   }
-  let config = await PricingConfig.findOne({ shopId });
+  const query = PricingConfig.findOne({ shopId });
+  let config = await (session?.role === "owner" ? query.select("+freePrintingPasswordHash") : query);
 
   if (!config) {
     config = await PricingConfig.create({ shopId, shopName: "My Print Shop", rates: DEFAULT_RATES });
   }
 
-  return NextResponse.json(config);
+  return NextResponse.json(pricingResponse(config, session?.role === "owner"));
 }
 
 /** PUT /api/settings/pricing — owner-only, updates pricing config */
@@ -73,14 +86,38 @@ export async function PUT(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
+    const { freePrintingPassword, clearFreePrintingPassword, ...fields } = parsed.data;
+    if (freePrintingPassword && clearFreePrintingPassword) {
+      return NextResponse.json({ error: "Set a new password or remove the saved password, not both." }, { status: 400 });
+    }
+
     await connectDB();
+    const existing = await PricingConfig.findOne({ shopId: session.shopId }).select("+freePrintingPasswordHash");
+    const freePrintingEnabled = fields.freePrinting ?? existing?.freePrinting ?? false;
+    if (clearFreePrintingPassword && freePrintingEnabled) {
+      return NextResponse.json({ error: "Turn off free printing before removing its password." }, { status: 400 });
+    }
+
+    const passwordHash = freePrintingPassword
+      ? await hashPassword(freePrintingPassword)
+      : clearFreePrintingPassword
+        ? ""
+        : existing?.freePrintingPasswordHash ?? "";
+    if (freePrintingEnabled && !passwordHash) {
+      return NextResponse.json({ error: "Set a free printing password before enabling free printing." }, { status: 400 });
+    }
+
     // Free printing and paid methods are exclusive: when free printing is on, Cash and Online are forced off.
-    const update = parsed.data.freePrinting ? { ...parsed.data, cashPaymentEnabled: false, onlinePaymentEnabled: false } : parsed.data;
+    const update = {
+      ...fields,
+      ...(fields.freePrinting ? { cashPaymentEnabled: false, onlinePaymentEnabled: false } : {}),
+      ...(freePrintingPassword || clearFreePrintingPassword ? { freePrintingPasswordHash: passwordHash } : {}),
+    };
     const config = await PricingConfig.findOneAndUpdate({ shopId: session.shopId }, { $set: update }, {
       returnDocument: "after",
       upsert: true,
-    });
-    return NextResponse.json(config);
+    }).select("+freePrintingPasswordHash");
+    return NextResponse.json(pricingResponse(config, true));
   } catch (err) {
     return serverError(err, "Failed to update pricing");
   }
