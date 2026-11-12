@@ -91,10 +91,12 @@ export function calcOrderPrice(input: PriceBreakdownInput): PriceBreakdown {
   // priced; double-sided then halves the sheets of paper (and keeps its own discount).
   const sides = countSides(input.pages, input.pagesPerSheet ?? 1);
   const sheets = countSheets(input.pages, input.pagesPerSheet ?? 1, input.duplex);
-  const baseCost = calcSetPrice(rate, sides) * Math.max(1, input.copies);
+  const copies = Math.max(1, input.copies);
+  const baseCost = calcSetPrice(rate, sides) * copies;
+  const duplexDiscountBase = sides > 0 ? Math.max(0, baseCost - rate.page1 * copies) : 0;
 
   const duplexDiscount = input.duplex
-    ? Math.round((baseCost * input.duplexDiscountPercent) / 100)
+    ? Math.min(duplexDiscountBase, Math.round((duplexDiscountBase * input.duplexDiscountPercent) / 100))
     : 0;
 
   let bindingCharge = 0;

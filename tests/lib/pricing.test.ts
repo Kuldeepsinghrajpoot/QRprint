@@ -85,6 +85,23 @@ describe("calcOrderPrice extras", () => {
     expect(r.subtotal).toBe(37);
     expect(r.sheets).toBe(5);
   });
+  it("keeps the first page at full price and discounts page 2 onward", () => {
+    const onePage = price({ pages: 1, duplex: true, duplexDiscountPercent: 100 });
+    expect(onePage.baseCost).toBe(5);
+    expect(onePage.duplexDiscount).toBe(0);
+    expect(onePage.subtotal).toBe(5);
+
+    const twoPages = price({ pages: 2, duplex: true, duplexDiscountPercent: 25 });
+    expect(twoPages.baseCost).toBe(9);
+    expect(twoPages.duplexDiscount).toBe(1);
+    expect(twoPages.subtotal).toBe(8);
+  });
+  it("applies the duplex discount to pages 2 onward across copies", () => {
+    const r = price({ pages: 2, copies: 2, duplex: true, duplexDiscountPercent: 25 });
+    expect(r.baseCost).toBe(18);
+    expect(r.duplexDiscount).toBe(2);
+    expect(r.subtotal).toBe(16);
+  });
   it("no discount when not duplex", () => expect(price({ pages: 10, duplexDiscountPercent: 50 }).duplexDiscount).toBe(0));
   it("spiral binding is per copy", () => expect(price({ binding: "spiral", copies: 2 }).bindingCharge).toBe(60));
   it("lamination is per sheet per copy", () => {
@@ -102,8 +119,10 @@ describe("calcOrderPrice extras", () => {
     const r = price({ pages: 10, priority: false, priorityFeePercent: 50, gstEnabled: false });
     expect(r.total).toBe(41);
   });
-  it("never goes negative with a 100%+ duplex discount", () => {
-    expect(price({ pages: 3, duplex: true, duplexDiscountPercent: 150 }).subtotal).toBe(0);
+  it("never discounts the first page, even if the discount exceeds 100%", () => {
+    const r = price({ pages: 3, duplex: true, duplexDiscountPercent: 150 });
+    expect(r.duplexDiscount).toBe(8);
+    expect(r.subtotal).toBe(5);
   });
   it("total is always an integer", () => {
     const r = price({ pages: 7, copies: 3, duplex: true, duplexDiscountPercent: 13, priority: true, priorityFeePercent: 7, gstEnabled: true, gstPercent: 18 });

@@ -23,7 +23,7 @@ export interface IPricingConfig extends Document {
   availability: Record<"A4" | "A3" | "Legal" | "Letter" | "Photo", { bw: boolean; color: boolean }>;
 
   // Flat add-on charges
-  duplexDiscountPercent: number; // % discount on subtotal for double-side printing (paper saving)
+  duplexDiscountPercent: number; // % discount on pages 2+ for double-side printing; page 1 stays full price
   bindingSpiralCharge: number;
   bindingLaminationCharge: number; // per page
   priorityFeePercent: number; // % extra on subtotal for rush print

@@ -758,7 +758,7 @@ export default function CustomerPage() {
                   <SwitchRow
                     icon="layers"
                     title="Double-sided"
-                    hint={config?.duplexDiscountPercent ? `Uses less paper, ${config.duplexDiscountPercent}% off` : "Uses less paper"}
+                    hint={config?.duplexDiscountPercent ? `Page 1 full price; ${config.duplexDiscountPercent}% off from page 2` : "Uses less paper"}
                     on={duplex}
                     onClick={() => setDuplex((v) => !v)}
                   />
