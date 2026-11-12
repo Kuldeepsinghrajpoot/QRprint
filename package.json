@@ -15,6 +15,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1124.0",
     "@aws-sdk/s3-request-presigner": "^3.1124.0",
+    "@vercel/speed-insights": "^2.1.0",
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.10",
     "mongoose": "^9.9.4",

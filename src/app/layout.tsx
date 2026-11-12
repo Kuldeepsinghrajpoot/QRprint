@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import { PALETTE_INIT_SCRIPT } from "@/lib/palettes";
 import { publicSans } from "@/components/landing/fonts";
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.qr.lexicalsoftware.in";
 const DESCRIPTION =
@@ -32,7 +33,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           dangerouslySetInnerHTML={{ __html: PALETTE_INIT_SCRIPT }}
         />
       </head>
-      <body className={`${publicSans.className} min-h-full flex flex-col`}>{children}</body>
+      <body className={`${publicSans.className} min-h-full flex flex-col`}>
+        {children}
+        <SpeedInsights />
+      </body>
     </html>
   );
 }
