@@ -736,22 +736,6 @@ export default function CustomerPage() {
                 </div>
               </div>
 
-              {duplex && (
-                <Field label="Flip on">
-                  <Segmented
-                    value={duplexEdge}
-                    onChange={setDuplexEdge}
-                    options={[
-                      { value: "long", label: "Long edge" },
-                      { value: "short", label: "Short edge" },
-                    ]}
-                  />
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    {duplexEdge === "long" ? "Pages turn like a book (side binding)." : "Pages turn like a notepad (top binding)."}
-                  </p>
-                </Field>
-              )}
-
               {showDuplexTip && (
                 <div className="rounded-lg border border-[color:var(--accent)]/20 px-3.5 py-2.5 text-[12.5px] text-slate-700" style={{ background: "rgb(var(--accent-rgb) / 0.06)" }}>
                   This document has {pages} pages — turn on <strong>Double-sided</strong> to cut your paper cost.
