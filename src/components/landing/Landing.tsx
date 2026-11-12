@@ -61,42 +61,71 @@ const faqs = [
 
 function Btn({ href, children, solid = true }: { href: string; children: React.ReactNode; solid?: boolean }) {
   return (
-    <a href={href} className={`inline-flex items-center justify-center rounded-md px-6 py-3 font-semibold transition-colors ${solid ? "bg-brand text-white hover:bg-brand-dark" : "border-2 border-ink/15 text-ink hover:border-brand hover:text-brand"}`}>
+    <a href={href} className={`inline-flex min-h-12 items-center justify-center rounded-xl px-6 py-3 font-semibold transition-all hover:-translate-y-0.5 ${solid ? "bg-brand text-white shadow-lg shadow-brand/20 hover:bg-brand-dark hover:shadow-xl" : "border border-ink/15 bg-white/70 text-ink hover:border-brand/40 hover:bg-white hover:text-brand"}`}>
       {children}
     </a>
   );
 }
 
-function PhoneMock() {
+function PrintQueueMock() {
   return (
-    <div className="relative mx-auto w-[300px] pb-16">
-      <div className="relative z-10 rounded-[2.4rem] border-[9px] border-ink bg-white p-4 shadow-2xl">
-        <div className="mx-auto mb-3 h-1.5 w-16 rounded-full bg-ink/20" />
-        <p className="font-display text-lg font-bold">Sharma Cyber Cafe</p>
-        <p className="mb-3 text-xs text-ink/60">Upload and print</p>
-        {["Admit_Card.pdf", "Exam_Form.pdf"].map((f) => (
-          <div key={f} className="mb-2 flex items-center gap-3 rounded-xl bg-mist/70 p-2.5">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand text-[10px] font-bold text-white">PDF</span>
-            <span className="text-sm"><b className="block font-semibold">{f}</b><i className="text-xs not-italic text-ink/60">2 pages, B&amp;W</i></span>
-          </div>
-        ))}
-        <div className="my-3 flex gap-2 text-xs font-semibold">
-          <span className="rounded-full bg-ink px-3 py-1 text-white">B&amp;W</span>
-          <span className="rounded-full bg-mist px-3 py-1">Colour</span>
-          <span className="rounded-full bg-mist px-3 py-1">2 copies</span>
-        </div>
-        <div className="flex items-center justify-between border-t border-dashed border-ink/20 pt-3">
-          <span className="text-sm text-ink/60">Total</span><span className="font-display text-2xl font-bold">₹40</span>
-        </div>
-        <div className="mt-3 rounded-md bg-brand py-3 text-center font-semibold text-white">Pay with UPI</div>
+    <div className="relative mx-auto w-full pb-12 pt-5 sm:pb-14 sm:pt-8">
+      <div aria-hidden="true" className="absolute left-1/2 top-1/2 h-[22rem] w-[22rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/10 blur-3xl" />
+      <div className="absolute right-0 top-0 z-20 flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3.5 py-2 text-xs font-bold text-emerald-800 shadow-lg shadow-ink/5 sm:right-2">
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+        </span>
+        AGENT CONNECTED
       </div>
-      <div className="absolute inset-x-0 bottom-0 z-20 mx-auto h-14 w-[340px] -translate-x-5 rounded-md bg-ink">
-        <div className="absolute inset-x-6 top-0 h-1.5 rounded-full bg-black" />
-        <div className="absolute inset-x-10 top-1 h-24 overflow-hidden">
-          <div className="paper-feed h-full rounded-b-md border border-ink/10 bg-white p-2 text-[9px] leading-tight text-ink/50 shadow">
-            Order #214<br />Admit_Card.pdf<br />Printing on HP 1020
+      <div className="relative z-10 mx-auto max-w-[25rem] rounded-[1.75rem] border border-white bg-white/95 p-4 shadow-[0_28px_70px_-24px_rgba(35,23,16,0.38)] sm:p-5">
+        <div className="flex items-center gap-3 border-b border-ink/5 pb-4">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand text-lg font-extrabold text-white shadow-md shadow-brand/20">P</div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-base font-extrabold text-ink sm:text-lg">Pradeep CSC</p>
+            <p className="text-xs text-ink/55">Print shop dashboard</p>
+          </div>
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">ONLINE</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 py-4">
+          <div className="rounded-xl bg-[#fff7f0] p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-ink/45">New orders</p>
+            <p className="mt-1 font-display text-xl font-extrabold text-ink">02 <span className="text-xs font-medium text-ink/45">today</span></p>
+          </div>
+          <div className="rounded-xl bg-[#fff7f0] p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-ink/45">Printers online</p>
+            <p className="mt-1 font-display text-xl font-extrabold text-ink">02 <span className="text-xs font-medium text-ink/45">ready</span></p>
           </div>
         </div>
+
+        <div className="rounded-2xl border border-ink/8 bg-white p-3.5 sm:p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-ink/45">Now printing</p>
+              <p className="mt-1 font-bold text-ink">Order #214</p>
+            </div>
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">PAID · ₹40</span>
+          </div>
+          <div className="my-3 flex items-center gap-3 rounded-xl bg-[#fff7f0] p-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand"><Files size={20} /></span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-ink">Admit_Card.pdf</p>
+              <p className="text-xs text-ink/55">4 pages · A4 · B&amp;W</p>
+            </div>
+            <span className="text-xs font-bold text-ink">×2</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Printer size={15} className="shrink-0 text-brand" />
+            <span className="font-medium text-ink">HP LaserJet Pro</span>
+            <span className="ml-auto text-emerald-700">Printing</span>
+          </div>
+          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-ink/8"><div className="h-full w-2/3 rounded-full bg-brand" /></div>
+        </div>
+      </div>
+      <div className="absolute bottom-0 left-0 z-20 flex items-center gap-2 rounded-xl border border-white/80 bg-white/95 px-3 py-2.5 shadow-lg shadow-ink/10 backdrop-blur sm:left-2">
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><Check size={17} /></span>
+        <span><span className="block text-[10px] font-medium text-ink/50">Payment received</span><span className="block text-xs font-bold text-ink">₹40 via UPI</span></span>
       </div>
     </div>
   );
@@ -105,44 +134,65 @@ function PhoneMock() {
 export default function Landing() {
   return (
     <div className={`landing ${publicSans.variable} font-landing bg-paper text-ink antialiased`}>
-      <div className="flex items-center justify-center gap-2 bg-sun px-5 py-2 text-center text-sm font-semibold text-ink"><Gift size={18} className="shrink-0" />Limited-time offer: everything is free. Sign up today and start printing.</div>
-      <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
-          <a href="#" className="flex items-center gap-2.5 font-display text-2xl font-extrabold text-brand"><Image src="/chhapo-logo.svg" alt="" width={36} height={36} />{SITE.name}</a>
-          <nav className="hidden gap-7 text-sm font-medium md:flex">
-            {[["How it works", "#how"], ["Features", "#features"], ["Pricing", "#pricing"], ["Install", "/print-agent"], ["FAQ", "#faq"]].map(([l, h]) => (
-              <a key={h} href={h} className="hover:text-brand">{l}</a>
+      <div className="flex items-center justify-center gap-2 bg-ink px-5 py-2.5 text-center text-xs font-semibold text-white sm:text-sm">
+        <Gift size={16} className="shrink-0 text-sun" />
+        <span><span className="text-sun">Launch offer:</span> All plans are free for a limited time.</span>
+        <Link href="/signup" className="hidden underline decoration-white/40 underline-offset-4 hover:text-sun sm:inline">Get started</Link>
+      </div>
+      <header className="sticky top-0 z-40 border-b border-ink/5 bg-paper/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
+          <Link href="/" className="flex items-center gap-2.5 font-display text-xl font-extrabold tracking-tight text-ink sm:text-2xl">
+            <Image src="/chhapo-logo.svg" alt="" width={38} height={38} />
+            {SITE.name}
+          </Link>
+          <nav className="hidden items-center gap-4 text-xs font-semibold text-ink/65 md:flex xl:gap-7 xl:text-sm">
+            {[["How it works", "#how"], ["Features", "#features"], ["Pricing", "#pricing"], ["Print Agent", "/print-agent"], ["FAQ", "#faq"]].map(([l, h]) => (
+              <a key={h} href={h} className="transition-colors hover:text-brand">{l}</a>
             ))}
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <LoginModal />
-            <span className="hidden sm:block"><Btn href="/signup">Start free</Btn></span>
+            <span className="hidden sm:block"><Btn href="/signup">Create your shop</Btn></span>
             <MobileMenu />
           </div>
         </div>
       </header>
 
       <main>
-        <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 pb-16 pt-14 md:grid-cols-[1.15fr_1fr] md:pt-20">
-          <div>
-            <p className="mb-4 inline-block rounded-full bg-mist px-4 py-1.5 text-sm font-medium text-brand-dark">For cyber cafes, xerox shops and CSC centers</p>
-            <h1 className="font-display text-5xl font-extrabold leading-[1.05] tracking-tight md:text-6xl">
-              Customers print from their phone. You just hand over the pages.
-            </h1>
-            <p className="mt-5 max-w-xl text-lg text-ink/70">
-              Customers scan your QR, upload PDFs or photos, pay by UPI straight to you, and the print comes out on your printer. No WhatsApp, no pen drive, no queue.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Btn href="/signup">Start free today</Btn>
-              <Btn href="#how" solid={false}>See how it works</Btn>
+        <section className="relative isolate overflow-hidden border-b border-ink/5 bg-[radial-gradient(ellipse_at_76%_42%,rgba(234,88,12,0.12),transparent_35%),linear-gradient(180deg,#fffaf6_0%,#fff5eb_100%)]">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-36 -top-44 h-[32rem] w-[32rem] rounded-full border border-brand/10" />
+          <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-28 h-[25rem] w-[25rem] rounded-full border border-brand/10" />
+          <div className="mx-auto grid max-w-6xl items-center gap-8 px-5 pb-12 pt-10 sm:gap-12 sm:pb-16 sm:pt-14 md:min-h-[590px] md:grid-cols-[1.1fr_0.9fr] md:py-12">
+            <div className="relative z-10">
+              <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand/15 bg-white/80 px-3.5 py-2 text-xs font-bold tracking-wide text-brand-dark shadow-sm sm:text-sm">
+                <span className="h-2 w-2 rounded-full bg-brand" />
+                MADE FOR INDIA&apos;S PRINT COUNTERS
+              </p>
+              <h1 className="max-w-3xl font-display text-[2.8rem] font-extrabold leading-[1.04] tracking-[-0.045em] text-ink sm:text-6xl lg:text-[4.35rem]">
+                From phone to printer.
+                <span className="mt-1 block text-brand">Without the queue.</span>
+              </h1>
+              <p className="mt-6 max-w-xl text-base leading-7 text-ink/70 sm:text-lg sm:leading-8">
+                Customers scan your QR, upload a file and pay you directly. Their order lands at the right printer, ready to go.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Btn href="/signup">Start free today <span aria-hidden="true">→</span></Btn>
+                <Btn href="#how" solid={false}>See how it works</Btn>
+              </div>
+              <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm font-medium text-ink/65">
+                {["No customer app", "Any Windows printer", "0% commission"].map((x) => (
+                  <li key={x} className="flex items-center gap-2"><span className="grid h-5 w-5 place-items-center rounded-full bg-emerald-100 text-emerald-700"><Check size={12} strokeWidth={3} /></span>{x}</li>
+                ))}
+              </ul>
             </div>
-            <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-ink/70">
-              {["Free for a limited period", "No app for customers", "Any Windows printer", "0% commission"].map((x) => (
-                <li key={x} className="flex items-center gap-1.5"><Check size={16} className="text-brand" />{x}</li>
-              ))}
-            </ul>
+            <div className="relative mx-auto w-full max-w-[28rem] rounded-[2rem] border border-white/80 bg-white/55 px-4 py-3 shadow-[0_24px_80px_-40px_rgba(91,45,19,0.32)] backdrop-blur-sm sm:px-7 sm:py-6">
+              <div className="mb-1 flex items-center justify-between px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-ink/45">
+                <span>One simple workflow</span>
+                <span className="flex items-center gap-1.5 normal-case tracking-normal text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Live</span>
+              </div>
+              <PrintQueueMock />
+            </div>
           </div>
-          <PhoneMock />
         </section>
 
         <section id="how" className="bg-ink py-20 text-paper">

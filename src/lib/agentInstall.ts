@@ -22,15 +22,7 @@ export const REQUIREMENTS: Bilingual[] = [
 ];
 
 export const INSTALL_STEPS: InstallStep[] = [
-  {
-    image: "1-download",
-    where: "pc",
-    title: { en: "Download the installer", hi: "इंस्टॉलर डाउनलोड करें" },
-    body: {
-      en: "Click the blue Download button above. When the download finishes, click “Open file” in your browser.",
-      hi: "ऊपर नीले Download बटन पर क्लिक करें। डाउनलोड पूरा होने पर ब्राउज़र में “Open file” पर क्लिक करें।",
-    },
-  },
+
   {
     image: "2-open-file",
     where: "pc",

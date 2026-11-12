@@ -11,6 +11,7 @@ const DESCRIPTION =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: "QRtoPrint | Scan, Upload & Print", template: "%s" },
+  icons: { icon: "/chhapo-logo.svg" },
   description: DESCRIPTION,
   applicationName: "QRtoPrint",
   keywords: ["print via QR", "QR printing", "online printing", "xerox shop software", "cyber cafe software", "print shop order system", "upload and print"],

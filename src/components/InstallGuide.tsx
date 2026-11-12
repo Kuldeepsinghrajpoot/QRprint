@@ -50,7 +50,7 @@ export default function InstallGuide() {
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/85">
           <T
             t={{
-              en: "A small app that prints your customers' paid orders automatically. Takes about 5 minutes.",
+              en: "A small app that prints your customers' paid orders automatically.",
               hi: "यह छोटी ऐप ग्राहकों के पेड ऑर्डर अपने आप प्रिंट करती है। लगभग 5 मिनट लगते हैं।",
             }}
             lang={lang}
