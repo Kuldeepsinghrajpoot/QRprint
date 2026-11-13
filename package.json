@@ -18,7 +18,7 @@
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.10",
     "mongoose": "^9.9.4",
-    "next": "16.3.4",
+    "next": "16.4.6",
     "nodemailer": "^10.3.1",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38",
@@ -38,10 +38,15 @@
     "@types/react-dom": "^19",
     "dotenv": "^17.4.2",
     "eslint": "^9",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.8"
+    }
   }
 }
